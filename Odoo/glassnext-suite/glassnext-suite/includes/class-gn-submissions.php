@@ -119,6 +119,10 @@ class GN_Submissions {
 
         $this->dispatch_makecom_webhook($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city);
 
+        $odoo_result = GN_Odoo::instance()->sync_order($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city);
+        update_post_meta($post_id, '_gn_odoo_order_id', $odoo_result['order_id'] ?? '');
+        update_post_meta($post_id, '_gn_odoo_error', $odoo_result['error'] ?? '');
+
         $thankyou_url = get_option('gn_thankyou_url', '');
 
         wp_send_json_success([

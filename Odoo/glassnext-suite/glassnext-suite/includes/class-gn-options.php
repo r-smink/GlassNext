@@ -76,6 +76,14 @@ class GN_Options {
 
             // Odoo / Make.com integratie
             'gn_makecom_webhook_url' => '',
+            'gn_odoo_enabled'        => '',
+            'gn_odoo_url'            => '',
+            'gn_odoo_db'             => '',
+            'gn_odoo_login'          => '',
+            'gn_odoo_api_key'        => '',
+            'gn_odoo_product_material' => '3',
+            'gn_odoo_product_mount'    => '5',
+            'gn_odoo_product_cut'      => '85',
 
             // Thank you page
             'gn_thankyou_url' => '',
@@ -129,9 +137,11 @@ class GN_Options {
             'gn_roi_gas_save_m2', 'gn_roi_cool_save_m2', 'gn_roi_building_factor',
             'gn_roi_eia_net', 'gn_roi_gas_price', 'gn_roi_elec_price', 'gn_roi_co2_price',
             'gn_roi_co2_gas', 'gn_roi_co2_elec', 'gn_roi_years',
-            'gn_offer_prefix',
+            'gn_offer_prefix', 'gn_offer_counter', 'gn_offer_counter_year',
             'gn_admin_email', 'gn_from_email', 'gn_from_name',
             'gn_makecom_webhook_url',
+            'gn_odoo_enabled', 'gn_odoo_url', 'gn_odoo_db', 'gn_odoo_login', 'gn_odoo_api_key',
+            'gn_odoo_product_material', 'gn_odoo_product_mount', 'gn_odoo_product_cut',
             'gn_thankyou_url',
         ];
 
@@ -285,10 +295,64 @@ class GN_Options {
                 <div class="gn-tab-panel" data-tab="odoo">
                 <h2 class="title">Odoo / Make.com integratie</h2>
                 <table class="form-table">
-                    <tr><th><label for="gn_makecom_webhook_url">Make.com Webhook URL</label></th><td><input type="url" id="gn_makecom_webhook_url" name="gn_makecom_webhook_url" value="<?php echo esc_attr(get_option('gn_makecom_webhook_url', '')); ?>" class="regular-text" placeholder="https://hook.eu1.make.com/xxxxx"><p class="description">Maak een Custom Webhook module aan in Make.com en plak hier de URL. Zodra ingevuld wordt elke nieuwe offerte-aanvraag automatisch naar Make.com gestuurd voor aanmaken in Odoo.</p></td></tr>
+                    <tr><th><label for="gn_makecom_webhook_url">Make.com Webhook URL</label></th><td><input type="url" id="gn_makecom_webhook_url" name="gn_makecom_webhook_url" value="<?php echo esc_attr(get_option('gn_makecom_webhook_url', '')); ?>" class="regular-text" placeholder="https://hook.eu1.make.com/xxxxx"><p class="description">Optioneel, naast of in plaats van de rechtstreekse Odoo-koppeling hieronder. Leeg laten = niet gebruikt.</p></td></tr>
+                </table>
+
+                <h2 class="title">Rechtstreekse Odoo-koppeling</h2>
+                <table class="form-table">
+                    <tr><th><label for="gn_odoo_enabled">Odoo-koppeling actief</label></th><td>
+                        <label><input type="checkbox" id="gn_odoo_enabled" name="gn_odoo_enabled" value="1" <?php checked(get_option('gn_odoo_enabled', ''), '1'); ?>> Bij elke nieuwe offerte-aanvraag automatisch een klant en verkooporder aanmaken in Odoo.</label>
+                    </td></tr>
+                    <tr><th><label for="gn_odoo_url">Odoo URL</label></th><td><input type="url" id="gn_odoo_url" name="gn_odoo_url" value="<?php echo esc_attr(get_option('gn_odoo_url', '')); ?>" class="regular-text" placeholder="https://glassnext.odoo.com"><p class="description">Gebruik het echte <code>.odoo.com</code>-adres van je database, geen custom domain.</p></td></tr>
+                    <tr><th><label for="gn_odoo_db">Database</label></th><td><input type="text" id="gn_odoo_db" name="gn_odoo_db" value="<?php echo esc_attr(get_option('gn_odoo_db', '')); ?>" class="regular-text" placeholder="glassnext"></td></tr>
+                    <tr><th><label for="gn_odoo_login">Login (e-mailadres)</label></th><td><input type="email" id="gn_odoo_login" name="gn_odoo_login" value="<?php echo esc_attr(get_option('gn_odoo_login', '')); ?>" class="regular-text"></td></tr>
+                    <tr><th><label for="gn_odoo_api_key">API-key</label></th><td><input type="password" id="gn_odoo_api_key" name="gn_odoo_api_key" value="<?php echo esc_attr(get_option('gn_odoo_api_key', '')); ?>" class="regular-text" autocomplete="new-password"><p class="description">Aanmaken via Odoo: Instellingen &gt; Voorkeuren &gt; Accountbeveiliging &gt; Nieuwe API-key.</p></td></tr>
+                    <tr><th><label for="gn_odoo_product_material">Product-ID: GlassShield per m²</label></th><td><input type="number" id="gn_odoo_product_material" name="gn_odoo_product_material" value="<?php echo esc_attr(get_option('gn_odoo_product_material', '3')); ?>" class="small-text"><p class="description">Aantal = netto rolverbruik (m²).</p></td></tr>
+                    <tr><th><label for="gn_odoo_product_mount">Product-ID: Aanbrengen GlassShield per m²</label></th><td><input type="number" id="gn_odoo_product_mount" name="gn_odoo_product_mount" value="<?php echo esc_attr(get_option('gn_odoo_product_mount', '5')); ?>" class="small-text"><p class="description">Aantal = rollengte (m²).</p></td></tr>
+                    <tr><th><label for="gn_odoo_product_cut">Product-ID: Programmeren en voorsnijden</label></th><td><input type="number" id="gn_odoo_product_cut" name="gn_odoo_product_cut" value="<?php echo esc_attr(get_option('gn_odoo_product_cut', '85')); ?>" class="small-text"><p class="description">Aantal = aantal stuks.</p></td></tr>
+                    <tr><th></th><td><p class="description">Voor al deze 3 producten wordt geen prijs meegestuurd; Odoo gebruikt de eigen verkoopprijs van het product. "Overige kosten" (hierboven bij Prijsinstellingen) worden wel als losse regel met eigen prijs meegestuurd.</p></td></tr>
+                    <tr><th>Verbinding testen</th><td>
+                        <button type="button" class="button" id="gn-test-odoo-connection">Test Odoo-verbinding</button>
+                        <span id="gn-test-odoo-spinner" class="spinner" style="float:none;"></span>
+                        <div id="gn-test-odoo-result" style="margin-top:10px;"></div>
+                        <p class="description">Let op: dit test met de waarden die nu in de velden hierboven staan, ook als je nog niet op "Instellingen opslaan" hebt geklikt.</p>
+                    </td></tr>
                 </table>
 
                 </div>
+
+                <script>
+                (function($){
+                    $('#gn-test-odoo-connection').on('click', function(){
+                        var $btn = $(this), $spinner = $('#gn-test-odoo-spinner'), $result = $('#gn-test-odoo-result');
+                        $btn.prop('disabled', true);
+                        $spinner.addClass('is-active');
+                        $result.html('');
+                        $.post(ajaxurl, {
+                            action: 'gn_test_odoo_connection',
+                            nonce: '<?php echo esc_js(wp_create_nonce('gn_test_odoo')); ?>',
+                            gn_odoo_url: $('#gn_odoo_url').val(),
+                            gn_odoo_db: $('#gn_odoo_db').val(),
+                            gn_odoo_login: $('#gn_odoo_login').val(),
+                            gn_odoo_api_key: $('#gn_odoo_api_key').val()
+                        }).done(function(res){
+                            var color = res.success ? '#087f5b' : '#c0392b';
+                            var html = '<p style="color:' + color + ';font-weight:700;">' + (res.message || '') + '</p>';
+                            html += '<p><strong>URL:</strong> ' + (res.url || '') + '</p>';
+                            if(res.debug){
+                                html += '<p><strong>Debug:</strong> db=' + (res.debug.db_used||'') + ' | login=' + (res.debug.login_used||'') + ' | key-lengte=' + (res.debug.key_length||0) + '</p>';
+                            }
+                            html += '<pre style="background:#f6f7f7;padding:10px;overflow:auto;max-height:300px;">' + (res.raw || '') + '</pre>';
+                            $result.html(html);
+                        }).fail(function(xhr){
+                            $result.html('<p style="color:#c0392b;">AJAX-fout: ' + xhr.status + '</p>');
+                        }).always(function(){
+                            $btn.prop('disabled', false);
+                            $spinner.removeClass('is-active');
+                        });
+                    });
+                })(jQuery);
+                </script>
 
                 <?php submit_button('Instellingen opslaan'); ?>
             </form>

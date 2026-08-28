@@ -16,7 +16,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
 <section class="page active" id="page-project">
 <div class="grid">
   <article class="card span-12">
-    <div class="card-head"><h2>Projectgegevens</h2><div class="toolbar no-print"><button class="btn secondary" id="loadJsonBtn">JSON laden</button><input type="file" id="loadJsonInput" accept=".json" style="display:none"></div></div>
+    <div class="card-head"><h2>Projectgegevens</h2><span class="pill">vul in voor offerte</span></div>
     <div class="card-body">
       <div class="fields">
         <div><label>Klant / organisatie naam</label><input id="customerName" placeholder="Uw organisatie naam"></div>

@@ -493,41 +493,6 @@ function submitOffer(){
 }
 $("#submitOffer").onclick=submitOffer;
 
-function loadProject(data){
-  const v=data.values||{};
-  const textIds=["offerNumber","customerName","contactName","email","phone","address","city","projectDescription","projectNotes","rollW","rollL","marginSide","kerf","materialPrice","cutPrice","materialDiscount","mountDiscount","vatRate","mountSelectedPrice","roiArea","roiGasSaveM2","roiCoolSaveM2","roiBuildingFactor","roiInvestment","roiEiaNet","roiGasPrice","roiElecPrice","roiCO2Price","roiCO2Gas","roiCO2Elec","roiYears"];
-  textIds.forEach(id=>{const el=$("#"+id);if(el&&v[id]!=null)el.value=v[id]});
-  const selectIds=["quality","rotateDefault","mountClass","mountAreaBasis","roiGlassType","roiAreaSource","roiGasMethod","roiInvestmentSource"];
-  selectIds.forEach(id=>{const el=$("#"+id);if(el&&v[id]!=null){[...el.options].forEach(o=>o.selected=o.value===String(v[id]))}});
-  const roiTextIds=["roiUBefore","roiUAfter","roiHDD","roiBoilerEff","roiGasKwh"];
-  roiTextIds.forEach(id=>{const el=$("#"+id);if(el&&v[id]!=null)el.value=v[id]});
-  const cb=$("#includeROIInOffer");if(cb&&typeof v.includeROIInOffer==="boolean")cb.checked=v.includeROIInOffer;
-  if(Array.isArray(data.panes)){
-    paneBody.innerHTML="";
-    data.panes.forEach(addPaneRow);
-  }
-  if(Array.isArray(data.otherCosts))setOtherCosts(data.otherCosts);
-  updateROIDerived();
-}
-
-$("#loadJsonBtn").onclick=()=>$("#loadJsonInput").click();
-$("#loadJsonInput").onchange=e=>{
-  const file=e.target.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    try{
-      const data=JSON.parse(ev.target.result);
-      loadProject(data);
-      $("#submitStatus").innerHTML='<span class="ok">Project geladen uit JSON. Klik op "Bereken snijplan" om het plan te herstellen.</span>';
-      activatePage("planner");
-    }catch(err){
-      alert("Kon het JSON bestand niet lezen: "+err.message);
-    }
-  };
-  reader.readAsText(file);
-  e.target.value="";
-};
-
 initConfig();
 applyROIProfile();
 }
