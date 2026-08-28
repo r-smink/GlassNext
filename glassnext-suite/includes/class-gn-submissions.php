@@ -117,10 +117,120 @@ class GN_Submissions {
         GN_Email::send_customer_confirmation($email, $offer_number, $customer_name);
         GN_Email::send_admin_notification($post_id, $offer_number, $customer_name, $email);
 
+        $this->dispatch_makecom_webhook($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city);
+
         wp_send_json_success([
             'offerNumber' => $offer_number,
             'message'     => 'Uw offerte aanvraag is ontvangen. Wij nemen spoedig contact met u op.',
         ]);
+    }
+
+    public function dispatch_makecom_webhook($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city) {
+        $webhook_url = get_option('gn_makecom_webhook_url', '');
+        if (empty($webhook_url)) return;
+
+        $values = $decoded['values'] ?? [];
+        $export = $decoded['exportData'] ?? [];
+
+        $payload = [
+            'offerNumber'  => $offer_number,
+            'submittedAt'  => current_time('mysql'),
+            'customer' => [
+                'name'        => $customer_name,
+                'contactName' => $contact_name,
+                'email'       => $email,
+                'phone'       => $phone,
+                'address'     => $address,
+                'city'        => $city,
+            ],
+            'project' => [
+                'description' => $values['projectDescription'] ?? '',
+                'notes'       => $values['projectNotes'] ?? '',
+            ],
+            'calculation' => [
+                'pieces'     => $export['pieces'] ?? 0,
+                'rollArea'   => $export['rollArea'] ?? 0,
+                'rollLength' => $export['rollLength'] ?? 0,
+                'mountClass' => $values['mountClass'] ?? 'average',
+            ],
+            'lineItems' => $this->extract_line_items($decoded),
+            'totals' => $this->extract_totals($decoded),
+            'panes'   => $decoded['panes'] ?? [],
+            'rawJson' => $decoded,
+        ];
+
+        wp_remote_post($webhook_url, [
+            'headers' => ['Content-Type' => 'application/json'],
+            'body'    => wp_json_encode($payload),
+            'timeout' => 15,
+        ]);
+    }
+
+    private function extract_line_items($decoded) {
+        $items = [];
+        $values = $decoded['values'] ?? [];
+        $export = $decoded['exportData'] ?? [];
+
+        $rollArea = floatval($export['rollArea'] ?? 0);
+        $matRate = floatval($values['materialPrice'] ?? 0);
+        $matDisc = floatval($values['materialDiscount'] ?? 0);
+        $matGross = $rollArea * $matRate;
+        $items[] = [
+            'name'        => 'GlassShield materiaal',
+            'description' => sprintf('%.2f m² rolverbruik à €%.2f/m²', $rollArea, $matRate),
+            'quantity'    => 1,
+            'unitPrice'   => round($matGross * (1 - $matDisc / 100), 2),
+        ];
+
+        $pieces = intval($export['pieces'] ?? 0);
+        $cutRate = floatval($values['cutPrice'] ?? 0);
+        $items[] = [
+            'name'        => 'Voorsnijden',
+            'description' => sprintf('%d stuks à €%.2f/stuk', $pieces, $cutRate),
+            'quantity'    => 1,
+            'unitPrice'   => round($pieces * $cutRate, 2),
+        ];
+
+        $mountClass = $values['mountClass'] ?? 'average';
+        $mountRate = floatval($values['mountSelectedPrice'] ?? 0);
+        $mountAreaBasis = $values['mountAreaBasis'] ?? 'net';
+        $mountArea = $mountAreaBasis === 'gross'
+            ? floatval($export['rollArea'] ?? 0)
+            : floatval($values['roiArea'] ?? 0);
+        $mountDisc = floatval($values['mountDiscount'] ?? 0);
+        $mountGross = $mountArea * $mountRate;
+        $items[] = [
+            'name'        => 'Montage – ' . $mountClass,
+            'description' => sprintf('%.2f m² à €%.2f/m²', $mountArea, $mountRate),
+            'quantity'    => 1,
+            'unitPrice'   => round($mountGross * (1 - $mountDisc / 100), 2),
+        ];
+
+        foreach (($decoded['otherCosts'] ?? []) as $cost) {
+            if (!empty($cost['description']) && floatval($cost['amount']) > 0) {
+                $items[] = [
+                    'name'        => $cost['description'],
+                    'description' => 'Overige kosten',
+                    'quantity'    => 1,
+                    'unitPrice'   => floatval($cost['amount']),
+                ];
+            }
+        }
+
+        return $items;
+    }
+
+    private function extract_totals($decoded) {
+        $lineItems = $this->extract_line_items($decoded);
+        $subtotal = array_reduce($lineItems, function($sum, $item) {
+            return $sum + $item['unitPrice'];
+        }, 0);
+        $vatRate = floatval($decoded['values']['vatRate'] ?? 21);
+        return [
+            'subtotal' => round($subtotal, 2),
+            'vatRate'  => $vatRate,
+            'total'    => round($subtotal * (1 + $vatRate / 100), 2),
+        ];
     }
 
     public function handle_json_download() {

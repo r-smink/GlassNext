@@ -73,6 +73,9 @@ class GN_Options {
             'gn_admin_email'        => get_option('admin_email'),
             'gn_from_email'         => get_option('admin_email'),
             'gn_from_name'          => 'GlassNext Suite',
+
+            // Odoo / Make.com integratie
+            'gn_makecom_webhook_url' => '',
         ];
     }
 
@@ -125,6 +128,7 @@ class GN_Options {
             'gn_roi_co2_gas', 'gn_roi_co2_elec', 'gn_roi_years',
             'gn_offer_prefix', 'gn_offer_counter', 'gn_offer_counter_year',
             'gn_admin_email', 'gn_from_email', 'gn_from_name',
+            'gn_makecom_webhook_url',
         ];
 
         foreach ($groups as $key) {
@@ -143,6 +147,7 @@ class GN_Options {
             <button type="button" class="gn-tab-link" data-tab="roi-finance">ROI financieel</button>
             <button type="button" class="gn-tab-link" data-tab="offer">Offerte</button>
             <button type="button" class="gn-tab-link" data-tab="email">E-mail</button>
+            <button type="button" class="gn-tab-link" data-tab="odoo">Odoo / Make.com</button>
         </nav>
             <form method="post" action="options.php">
                 <?php settings_fields('glassnext_settings_group'); ?>
@@ -268,6 +273,14 @@ class GN_Options {
                     <tr><th><label for="gn_admin_email">Admin e-mailadres (ontvangt notificaties)</label></th><td><input type="email" id="gn_admin_email" name="gn_admin_email" value="<?php echo esc_attr(get_option('gn_admin_email', get_option('admin_email'))); ?>" class="regular-text"></td></tr>
                     <tr><th><label for="gn_from_email">Afzender e-mailadres</label></th><td><input type="email" id="gn_from_email" name="gn_from_email" value="<?php echo esc_attr(get_option('gn_from_email', get_option('admin_email'))); ?>" class="regular-text"></td></tr>
                     <tr><th><label for="gn_from_name">Afzender naam</label></th><td><input type="text" id="gn_from_name" name="gn_from_name" value="<?php echo esc_attr(get_option('gn_from_name', 'GlassNext Suite')); ?>" class="regular-text"></td></tr>
+                </table>
+
+                </div>
+
+                <div class="gn-tab-panel" data-tab="odoo">
+                <h2 class="title">Odoo / Make.com integratie</h2>
+                <table class="form-table">
+                    <tr><th><label for="gn_makecom_webhook_url">Make.com Webhook URL</label></th><td><input type="url" id="gn_makecom_webhook_url" name="gn_makecom_webhook_url" value="<?php echo esc_attr(get_option('gn_makecom_webhook_url', '')); ?>" class="regular-text" placeholder="https://hook.eu1.make.com/xxxxx"><p class="description">Maak een Custom Webhook module aan in Make.com en plak hier de URL. Zodra ingevuld wordt elke nieuwe offerte-aanvraag automatisch naar Make.com gestuurd voor aanmaken in Odoo.</p></td></tr>
                 </table>
 
                 </div>
