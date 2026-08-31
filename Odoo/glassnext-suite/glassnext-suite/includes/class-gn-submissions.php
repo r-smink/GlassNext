@@ -86,6 +86,10 @@ class GN_Submissions {
         $phone = isset($_POST['phone']) ? sanitize_text_field($_POST['phone']) : '';
         $address = isset($_POST['address']) ? sanitize_text_field($_POST['address']) : '';
         $city = isset($_POST['city']) ? sanitize_text_field($_POST['city']) : '';
+        $flow_mode = isset($_POST['flow_mode']) ? sanitize_text_field($_POST['flow_mode']) : 'self';
+        $pref_date1 = isset($_POST['pref_date1']) ? sanitize_text_field($_POST['pref_date1']) : '';
+        $pref_date2 = isset($_POST['pref_date2']) ? sanitize_text_field($_POST['pref_date2']) : '';
+        $pref_date3 = isset($_POST['pref_date3']) ? sanitize_text_field($_POST['pref_date3']) : '';
 
         if (empty($customer_name)) {
             wp_send_json_error(['message' => 'Klant / organisatie naam is verplicht.']);
@@ -98,6 +102,12 @@ class GN_Submissions {
             $decoded['offerNumber'] = $offer_number;
             if (isset($decoded['values']) && is_array($decoded['values'])) {
                 $decoded['values']['offerNumber'] = $offer_number;
+            }
+            $decoded['flowMode'] = $flow_mode;
+            if ($flow_mode === 'measure') {
+                $decoded['prefDate1'] = $pref_date1;
+                $decoded['prefDate2'] = $pref_date2;
+                $decoded['prefDate3'] = $pref_date3;
             }
             $decoded['submittedAt'] = current_time('mysql');
             $project_json = wp_json_encode($decoded);
@@ -128,6 +138,12 @@ class GN_Submissions {
         update_post_meta($post_id, '_gn_address', $address);
         update_post_meta($post_id, '_gn_city', $city);
         update_post_meta($post_id, '_gn_status', 'nieuw');
+        update_post_meta($post_id, '_gn_flow_mode', $flow_mode);
+        if ($flow_mode === 'measure') {
+            update_post_meta($post_id, '_gn_pref_date1', $pref_date1);
+            update_post_meta($post_id, '_gn_pref_date2', $pref_date2);
+            update_post_meta($post_id, '_gn_pref_date3', $pref_date3);
+        }
 
         // Sla Snijplan PDF op (vanuit browser als base64 meegestuurd)
         $pdf_attachment_id = $this->save_plan_pdf_attachment($post_id, $offer_number, $decoded);
@@ -149,7 +165,7 @@ class GN_Submissions {
         // Verzamel bijlagen voor Odoo (PDF + CSV als base64)
         $odoo_attachments = $this->build_odoo_attachments($pdf_attachment_id, $csv_attachment_id, $offer_number);
 
-        $odoo_result = GN_Odoo::instance()->sync_order($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city, $odoo_attachments);
+        $odoo_result = GN_Odoo::instance()->sync_order($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city, $odoo_attachments, $flow_mode, $pref_date1, $pref_date2, $pref_date3);
         update_post_meta($post_id, '_gn_odoo_order_id', $odoo_result['order_id'] ?? '');
         update_post_meta($post_id, '_gn_odoo_error', $odoo_result['error'] ?? '');
 
@@ -172,6 +188,8 @@ class GN_Submissions {
         $payload = [
             'offerNumber'  => $offer_number,
             'submittedAt'  => current_time('mysql'),
+            'flowMode'     => $decoded['flowMode'] ?? 'self',
+            'prefDates'    => ($decoded['flowMode'] ?? 'self') === 'measure' ? [$decoded['prefDate1'] ?? '', $decoded['prefDate2'] ?? '', $decoded['prefDate3'] ?? ''] : [],
             'customer' => [
                 'name'        => $customer_name,
                 'contactName' => $contact_name,
@@ -208,6 +226,17 @@ class GN_Submissions {
         $items = [];
         $values = $decoded['values'] ?? [];
         $export = $decoded['exportData'] ?? [];
+
+        if (($decoded['flowMode'] ?? 'self') === 'measure') {
+            $items[] = [
+                'name'        => 'Laten opmeten',
+                'description' => 'Inmeten op locatie',
+                'quantity'    => 1,
+                'unitPrice'   => floatval(get_option('gn_measure_price', '149')),
+                'productId'   => (int) get_option('gn_odoo_product_measure', 0),
+            ];
+            return $items;
+        }
 
         $rollArea = floatval($export['rollArea'] ?? 0);
         $matRate = floatval($values['materialPrice'] ?? 0);
@@ -257,6 +286,14 @@ class GN_Submissions {
                 ];
             }
         }
+
+        $items[] = [
+            'name'        => 'Voorrijdkosten',
+            'description' => 'Nader te berekenen',
+            'quantity'    => 1,
+            'unitPrice'   => 0,
+            'productId'   => (int) get_option('gn_odoo_product_voorrijd', 86),
+        ];
 
         return $items;
     }

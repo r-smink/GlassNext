@@ -9,6 +9,7 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const safe=s=>String(s||"GlassNext").trim().replace(/[^a-z0-9_-]+/gi,"_").replace(/^_+|_+$/g,"")||"GlassNext";
 const colorFor=id=>{let h=0;for(const c of id)h=(h*31+c.charCodeAt(0))>>>0;return `hsl(${h%360} 70% 78%)`};
 let lastPlan=null,lastCalc=null,lastROI=null;
+let flowMode=null;
 const O=window.GN_CONFIG?.options||{};
 const ajaxUrl=window.GN_CONFIG?.ajaxUrl||"";
 const gnNonce=window.GN_CONFIG?.nonce||"";
@@ -37,9 +38,15 @@ function initConfig(){
   const mc=$("#mountClass"); if(mc&&O.gn_mount_class){[...mc.options].forEach(o=>o.selected=o.value===String(O.gn_mount_class))}
   const mab=$("#mountAreaBasis"); if(mab&&O.gn_mount_area_basis){[...mab.options].forEach(o=>o.selected=o.value===String(O.gn_mount_area_basis))}
   const otherCosts=O.gn_other_costs; if(Array.isArray(otherCosts))setOtherCosts(otherCosts);
+  const msp=$("#mountSelectedPrice");
+  if(msp&&!num(msp.value)){
+    const cls=$("#mountClass")?.value||O.gn_mount_class||"average";
+    const rates={easy:O.gn_mount_rate_easy,average:O.gn_mount_rate_average,complex:O.gn_mount_rate_complex,very:O.gn_mount_rate_very};
+    msp.value=num(rates[cls])||MOUNT_DEFAULT_RATES[cls]||45;
+  }
 }
 
-const PAGES=["project","planner","calc","roi","offer","workorder","exports"];
+const PAGES=["choice","planner","calc","roi","project","offer","workorder","exports"];
 function visiblePages(){return PAGES.filter(p=>{const t=$(`.tab[data-page="${p}"]`);return t&&!t.classList.contains("hidden")})}
 function activatePage(name){
   $$(".tab").forEach(b=>b.classList.toggle("active",b.dataset.page===name));
@@ -75,7 +82,90 @@ $$('input[name="installMode"]').forEach(r=>r.addEventListener("change",()=>{
   if(lastPlan){calculatePrices();if(lastROI)calculateROI()}
   if(typeof renderOffer==="function"&&$("#offerDoc").innerHTML)renderOffer();
 }));
-$$(".tab").forEach(b=>b.onclick=()=>activatePage(b.dataset.page));
+
+function setFlowMode(mode){
+  flowMode=mode;
+  const choiceTab=$('.tab[data-page="choice"]');
+  const plannerTab=$('.tab[data-page="planner"]');
+  const calcTab=$('.tab[data-page="calc"]');
+  const roiTab=$('.tab[data-page="roi"]');
+  const projectTab=$('.tab[data-page="project"]');
+  const offerTab=$('.tab[data-page="offer"]');
+  const measureDates=$('#measureDates');
+  const projectSubmit=$('#projectSubmit');
+  const submitOfferBtn=$('#submitOffer');
+
+  if(mode==="measure"){
+    if(choiceTab)choiceTab.classList.add('hidden');
+    if(plannerTab)plannerTab.classList.add('hidden');
+    if(calcTab)calcTab.classList.add('hidden');
+    if(roiTab)roiTab.classList.add('hidden');
+    if(projectTab)projectTab.classList.remove('hidden');
+    if(offerTab)offerTab.classList.remove('hidden');
+    if(measureDates)measureDates.classList.remove('hidden');
+    if(projectSubmit){projectSubmit.textContent='Inmeten aanvragen';projectSubmit.id='submitMeasure';}
+    $$('.self-flow-only').forEach(el=>el.classList.add('hidden'));
+    activatePage('project');
+  } else if(mode==="self"){
+    if(choiceTab)choiceTab.classList.add('hidden');
+    if(plannerTab)plannerTab.classList.remove('hidden');
+    if(calcTab)calcTab.classList.remove('hidden');
+    if(roiTab)roiTab.classList.remove('hidden');
+    if(projectTab)projectTab.classList.remove('hidden');
+    if(offerTab)offerTab.classList.remove('hidden');
+    if(measureDates)measureDates.classList.add('hidden');
+    if(projectSubmit){projectSubmit.textContent='Volgende';projectSubmit.id='projectSubmit';}
+    $$('.self-flow-only').forEach(el=>el.classList.add('hidden'));
+    const profRadio=document.querySelector('input[name="installMode"][value="professional"]');
+    if(profRadio)profRadio.checked=true;
+    activatePage('planner');
+  }
+}
+
+const choiceMeasureBtn=$('#choiceMeasure');
+if(choiceMeasureBtn)choiceMeasureBtn.onclick=()=>setFlowMode('measure');
+const choiceSelfBtn=$('#choiceSelf');
+if(choiceSelfBtn)choiceSelfBtn.onclick=()=>setFlowMode('self');
+
+function initTooltips(){
+  const cols=['kenmerk','breedte','hoogte','aantal','rotatie','ruimte'];
+  const tooltips={};
+  cols.forEach(col=>{
+    const textKey='gn_tooltip_'+col+'_text';
+    const imgKey='gn_tooltip_'+col+'_image';
+    tooltips[col]={text:O[textKey]||'',img:O[imgKey]||''};
+  });
+  $$('.tooltip-icon').forEach(icon=>{
+    const col=icon.dataset.tooltipCol;
+    const data=tooltips[col];
+    if(!data||(!data.text&&!data.img))return;
+    icon.addEventListener('mouseenter',e=>showTooltip(icon,data));
+    icon.addEventListener('mouseleave',()=>hideTooltip());
+    icon.addEventListener('click',e=>{e.preventDefault();toggleTooltip(icon,data)});
+  });
+}
+let activeTooltip=null;
+function showTooltip(anchor,data){
+  hideTooltip();
+  const pop=document.createElement('div');
+  pop.className='tooltip-popover';
+  pop.innerHTML=(data.img?`<img src="${esc(data.img)}" style="max-width:100%;border-radius:6px;margin-bottom:8px">`:"")+(data.text?`<p>${esc(data.text)}</p>`:"");
+  document.body.appendChild(pop);
+  const rect=anchor.getBoundingClientRect();
+  pop.style.position='fixed';
+  pop.style.top=(rect.bottom+8)+'px';
+  pop.style.left=Math.min(rect.left,window.innerWidth-320)+'px';
+  pop.style.zIndex='9999';
+  activeTooltip=pop;
+}
+function toggleTooltip(anchor,data){
+  if(activeTooltip)hideTooltip();
+  else showTooltip(anchor,data);
+}
+function hideTooltip(){
+  if(activeTooltip){activeTooltip.remove();activeTooltip=null;}
+}
+$$(".tab").forEach(b=>b.onclick=()=>{return false});
 document.addEventListener("click",e=>{
   const btn=e.target.closest(".nav-prev, .nav-next");
   if(!btn||btn.disabled)return;
@@ -95,12 +185,12 @@ const paneBody=$("#paneTable tbody");
 function addPaneRow(p={}){
   const tr=document.createElement("tr"),i=paneBody.children.length+1;
   const rot=p.rot??$("#rotateDefault").value;
-  tr.innerHTML=`<td><input class="pid" value="${esc(p.id||`R${i}`)}"></td>
-  <td><input class="pw" inputmode="decimal" value="${p.w??""}"></td>
-  <td><input class="ph" inputmode="decimal" value="${p.h??""}"></td>
+  tr.innerHTML=`<td><input class="pid" placeholder="bijv. R1" value="${esc(p.id||``)}"></td>
+  <td><input class="pw" inputmode="decimal" placeholder="bijv. 88" value="${p.w??""}"></td>
+  <td><input class="ph" inputmode="decimal" placeholder="bijv. 68" value="${p.h??""}"></td>
   <td><input class="pn" type="number" min="1" step="1" value="${p.n??1}"></td>
   <td><select class="prot"><option value="1"${String(rot)==="1"?" selected":""}>Ja</option><option value="0"${String(rot)==="0"?" selected":""}>Nee</option></select></td>
-  <td><input class="proom" value="${esc(p.room||"")}"></td>
+  <td><input class="proom" placeholder="bijv. Woonkamer" value="${esc(p.room||"")}"></td>
   <td><button class="btn danger small remove">Verwijder</button></td>`;
   tr.querySelector(".remove").onclick=()=>tr.remove();
   paneBody.appendChild(tr);
@@ -111,7 +201,7 @@ $("#demoPanes").onclick=()=>{paneBody.innerHTML="";[
   {id:"R2",w:48,h:96,n:6,room:"Entree"},
   {id:"R3",w:88,h:68,n:4,room:"Slaapkamer"}
 ].forEach(addPaneRow)};
-addPaneRow({id:"R1",w:88,h:68,n:4});
+addPaneRow();
 
 function readItems(){
   const margin=Math.max(0,num($("#marginSide").value)||0),items=[],errors=[];
@@ -222,8 +312,36 @@ $("#calculatePlan").onclick=async()=>{
   finally{$("#calculatePlan").disabled=false}
 };
 
+async function calculateAndProceed(){
+  const plannerNextBtn=$('#plannerNext');
+  if(!plannerNextBtn)return;
+  if(lastPlan){activatePage('calc');return;}
+  const rollW=num($("#rollW").value),rollL=num($("#rollL").value),kerf=Math.max(0,num($("#kerf").value)||0),{items,errors}=readItems();
+  if(errors.length)return alert(errors.join("\n"));
+  if(!(rollW>0&&rollL>0))return alert("Voer geldige rolmaten in.");
+  const tooWide=items.filter(x=>Math.min(x.w,x.canRotate?x.h:x.w)>rollW+EPS);
+  if(tooWide.length)return alert(`Past niet op de rol: ${tooWide.map(x=>x.label).join(", ")}`);
+  const origText=plannerNextBtn.textContent;
+  plannerNextBtn.disabled=true;plannerNextBtn.textContent='Berekenen…';
+  $("#progressBar").style.width="0%";
+  try{
+    const res=await optimize(items,rollW,kerf,parseInt($("#quality").value,10));
+    if(!res){plannerNextBtn.disabled=false;plannerNextBtn.textContent=origText;return alert("Geen geldige indeling gevonden.");}
+    renderPlan(res,rollW,rollL,kerf);
+    activatePage('calc');
+  }finally{
+    plannerNextBtn.disabled=false;plannerNextBtn.textContent=origText;
+  }
+}
+
 const MOUNT_DEFAULT_RATES={easy:35,average:45,complex:60,very:75};
-function selectedMountRate(){return Math.max(0,num($("#mountSelectedPrice").value)||0)}
+function selectedMountRate(){
+  const direct=num($("#mountSelectedPrice").value)||0;
+  if(direct>0)return direct;
+  const cls=$("#mountClass")?.value||"average";
+  const rates={easy:O.gn_mount_rate_easy,average:O.gn_mount_rate_average,complex:O.gn_mount_rate_complex,very:O.gn_mount_rate_very};
+  return Math.max(0,num(rates[cls])||MOUNT_DEFAULT_RATES[cls]||0);
+}
 function mountClassText(){return {easy:"Eenvoudig",average:"Gemiddeld",complex:"Complex",very:"Zeer complex"}[$("#mountClass").value]}
 
 function addOtherCostRow(p={}){
@@ -258,6 +376,7 @@ function calculatePrices(){
   $("#calcWarning").innerHTML='<span class="ok">Calculatie bijgewerkt op basis van het actuele snijplan.</span>';
   $("#calcMetrics").innerHTML=`<div class="metric">Netto glas<strong>${fmtN(s.netArea)} m²</strong></div><div class="metric">Te factureren materiaal<strong>${fmtN(s.rollArea)} m²</strong></div><div class="metric">Aantal voorgesneden stukken<strong>${pieces}</strong></div><div class="metric">Montageklasse<strong>${mountClassText()}</strong></div>`;
   const otherRows=otherCosts.filter(x=>x.amount>0).map(x=>`<tr><td>${esc(x.description||"Overige kosten")}</td><td>Overige kosten</td><td></td><td>${fmtMoney(x.amount)}</td></tr>`).join("");
+  const voorrijdRow=`<tr><td>Voorrijdkosten</td><td>Nader te berekenen</td><td></td><td>Nader te berekenen</td></tr>`;
   $("#calcRows").innerHTML=`
     <tr><td>GlassShield materiaal</td><td>${fmtN(s.rollArea)} m² rolverbruik</td><td>${fmtMoney(matRate)}/m²</td><td>${fmtMoney(matGross)}</td></tr>
     ${matDisc?`<tr><td>Materiaalkorting</td><td>${fmtN(num($("#materialDiscount").value),1)}%</td><td></td><td>- ${fmtMoney(matDisc)}</td></tr>`:""}
@@ -265,6 +384,7 @@ function calculatePrices(){
     ${selfInstall?"":`<tr><td>Montage – ${mountClassText()}</td><td>${fmtN(mountArea)} m²</td><td>${fmtMoney(mountRate)}/m²</td><td>${fmtMoney(mountGross)}</td></tr>`}
     ${mountDisc?`<tr><td>Montagekorting</td><td>${fmtN(num($("#mountDiscount").value),1)}%</td><td></td><td>- ${fmtMoney(mountDisc)}</td></tr>`:""}
     ${otherRows}
+    ${voorrijdRow}
     <tr class="total-row"><td colspan="3">Totaal excl. btw</td><td>${fmtMoney(subtotal)}</td></tr>
     <tr><td colspan="3">${fmtN(lastCalc.vatRate,1)}% btw</td><td>${fmtMoney(vat)}</td></tr>
     <tr class="grand-row"><td colspan="3">Totaal incl. btw</td><td>${fmtMoney(total)}</td></tr>`;
@@ -275,7 +395,14 @@ $("#recalculate").onclick=()=>{calculatePrices();calculateROI()};
 
 function projectData(){
   const ids=["offerNumber","customerName","contactName","email","phone","address","city","projectDescription","projectNotes"];
-  return Object.fromEntries(ids.map(id=>[id,$("#"+id).value]));
+  const data=Object.fromEntries(ids.map(id=>[id,$("#"+id).value]));
+  data.flowMode=flowMode;
+  if(flowMode==="measure"){
+    data.prefDate1=$("#prefDate1")?.value||"";
+    data.prefDate2=$("#prefDate2")?.value||"";
+    data.prefDate3=$("#prefDate3")?.value||"";
+  }
+  return data;
 }
 function companyHeader(){
   return `<div class="doc-head"><div><div class="doc-brand">Glass Next B.V.</div><div>Nano-EcoLine Climate GlassShield</div></div><div style="text-align:right"><b>Isoleren zonder glas te vervangen.</b><br><span class="note">Nanothermische Low-E glas-upgrade</span></div></div>`;
@@ -412,6 +539,7 @@ function renderOffer(){
     ${c.selfInstall?"":`<tr><td>Aanbrengen GlassShield – montageklasse ${mountClassText()} (${fmtN(c.mountArea)} m² à ${fmtMoney(c.mountRate)}/m²)</td><td>${fmtMoney(c.mountGross)}</td></tr>`}
     ${c.selfInstall?"":(c.mountDisc?`<tr><td>Projectkorting montage</td><td>- ${fmtMoney(c.mountDisc)}</td></tr>`:"")}
     ${(c.otherCosts||[]).filter(x=>x.amount>0).map(x=>`<tr><td>${esc(x.description||"Overige kosten")}</td><td>${fmtMoney(x.amount)}</td></tr>`).join("")}
+    <tr><td>Voorrijdkosten</td><td>Nader te berekenen</td></tr>
     <tr class="total-row"><td>Totaal excl. btw</td><td>${fmtMoney(c.subtotal)}</td></tr><tr><td>${fmtN(c.vatRate,1)}% btw</td><td>${fmtMoney(c.vat)}</td></tr><tr class="grand-row"><td>Totaal incl. btw</td><td>${fmtMoney(c.total)}</td></tr></tbody></table>
     ${c.selfInstall?"":`<h3>Werkzaamheden montage</h3><ul><li>Bevochtigen en reinigen van de glasoppervlakken</li><li>Voorbereiden en positioneren van GlassShield</li><li>Verwijderen van vocht en luchtinsluitingen</li><li>Schoonsnijden en afwerken van de folie</li><li>Reinigen van glas, kozijnen en vensterbanken</li></ul>`}
     ${p.projectNotes?`<h3>Bijzonderheden</h3><p>${esc(p.projectNotes)}</p>`:""}
@@ -484,9 +612,10 @@ function docToPDF(type){
       [`Materiaalkorting`,-c.matDisc],
       [`Voorsnijden (${c.pieces} stuks)`,c.cut],
       ...(c.selfInstall?[]:[[`Montage – ${mountClassText()}`,c.mountGross],[`Montagekorting`,-c.mountDisc]]),
-      ...(c.otherCosts||[]).map(x=>[x.description||"Overige kosten",x.amount])
+      ...(c.otherCosts||[]).map(x=>[x.description||"Overige kosten",x.amount]),
+      [`Voorrijdkosten`,`Nader te berekenen`]
     ];
-    offerCostRows.filter(x=>Math.abs(x[1])>.001).forEach(([t,v])=>{doc.text(String(t),15,y,{maxWidth:145});doc.text(fmtMoney(v),195,y,{align:"right"});y+=7});
+    offerCostRows.filter(x=>typeof x[1]==="string"||Math.abs(x[1])>.001).forEach(([t,v])=>{doc.text(String(t),15,y,{maxWidth:145});doc.text(typeof v==="string"?v:fmtMoney(v),195,y,{align:"right"});y+=7});
     doc.line(15,y,195,y);y+=7;doc.setFont("helvetica","bold");doc.text("Totaal excl. btw",15,y);doc.text(fmtMoney(c.subtotal),195,y,{align:"right"});y+=7;doc.setFont("helvetica","normal");doc.text(`${fmtN(c.vatRate,1)}% btw`,15,y);doc.text(fmtMoney(c.vat),195,y,{align:"right"});y+=8;doc.setFont("helvetica","bold");doc.text("Totaal incl. btw",15,y);doc.text(fmtMoney(c.total),195,y,{align:"right"});
     doc.save(`${safe(p.customerName)}_offerte.pdf`);
   }
@@ -497,6 +626,12 @@ function collectProject(){
   const inputIds=["offerNumber","customerName","contactName","email","phone","address","city","projectDescription","projectNotes","rollW","rollL","marginSide","kerf","quality","rotateDefault","materialPrice","cutPrice","materialDiscount","mountDiscount","vatRate","mountClass","mountAreaBasis","mountSelectedPrice","roiGlassType","roiAreaSource","roiArea","roiGasMethod","roiUBefore","roiUAfter","roiHDD","roiBoilerEff","roiGasKwh","roiGasSaveM2","roiCoolSaveM2","roiBuildingFactor","roiInvestmentSource","roiInvestment","roiEiaNet","roiGasPrice","roiElecPrice","roiCO2Price","roiCO2Gas","roiCO2Elec","roiYears","includeROIInOffer"];
   const values=Object.fromEntries(inputIds.map(id=>[id,$("#"+id).type==="checkbox"?$("#"+id).checked:$("#"+id).value]));
   values.installMode=installMode();
+  values.flowMode=flowMode;
+  if(flowMode==="measure"){
+    values.prefDate1=$("#prefDate1")?.value||"";
+    values.prefDate2=$("#prefDate2")?.value||"";
+    values.prefDate3=$("#prefDate3")?.value||"";
+  }
   const panes=$$("#paneTable tbody tr").map(tr=>({id:tr.querySelector(".pid").value,w:tr.querySelector(".pw").value,h:tr.querySelector(".ph").value,n:tr.querySelector(".pn").value,rot:tr.querySelector(".prot").value,room:tr.querySelector(".proom").value}));
   const workorderData=lastPlan?renderWorkorderHTML():null;
   const exportData=lastPlan?{project:$("#customerName").value,pieces:lastPlan.placed.length,rollLength:lastPlan.totalLen/1000,rollArea:lastPlan.stats.rollArea,roiStatus:lastROI?"Berekend":"Nog niet berekend"}:null;
@@ -510,7 +645,7 @@ function collectProject(){
       netW:p.item.netW,netH:p.item.netH,rotated:p.rotated,margin:p.item.margin
     }))
   }:null;
-  return{version:"GlassNext Suite v4.5-WP",savedAt:new Date().toISOString(),values,panes,otherCosts:readOtherCosts(),workorderData,exportData,planData};
+  return{version:"GlassNext Suite v5.0-WP",savedAt:new Date().toISOString(),values,panes,otherCosts:readOtherCosts(),workorderData,exportData,planData};
 }
 function renderWorkorderHTML(){
   if(!lastPlan)return"";
@@ -529,7 +664,7 @@ function submitOffer(){
   const p=projectData();
   if(!p.customerName||!p.customerName.trim())return alert("Vul uw klant / organisatie naam in.");
   if(!p.email||!p.email.trim())return alert("Vul uw e-mailadres in.");
-  if(!lastPlan)return alert("Bereken eerst een snijplan voordat u een offerte aanvraagt.");
+  if(flowMode!=="measure"&&!lastPlan)return alert("Bereken eerst een snijplan voordat u een offerte aanvraagt.");
   const btn=$("#submitOffer");btn.disabled=true;const orig=btn.textContent;btn.textContent="Verzenden…";
   $("#submitStatus").innerHTML='<span class="note">Uw aanvraag wordt verzonden…</span>';
   const data=collectProject();
@@ -543,14 +678,21 @@ function submitOffer(){
   formData.append("phone",p.phone);
   formData.append("address",p.address);
   formData.append("city",p.city);
-  // Genereer Snijplan PDF als base64 en stuur mee voor admin/Odoo
-  try{
-    const pdfDataUri=generatePlanPDFBase64();
-    if(pdfDataUri){
-      formData.append("plan_pdf",pdfDataUri);
-      formData.append("plan_pdf_filename",`${safe(p.customerName)}_snijplan.pdf`);
-    }
-  }catch(e){console.warn("PDF generatie mislukt:",e)}
+  formData.append("flow_mode",flowMode||"self");
+  if(flowMode==="measure"){
+    formData.append("pref_date1",p.prefDate1||"");
+    formData.append("pref_date2",p.prefDate2||"");
+    formData.append("pref_date3",p.prefDate3||"");
+  }
+  if(flowMode!=="measure"&&lastPlan){
+    try{
+      const pdfDataUri=generatePlanPDFBase64();
+      if(pdfDataUri){
+        formData.append("plan_pdf",pdfDataUri);
+        formData.append("plan_pdf_filename",`${safe(p.customerName)}_snijplan.pdf`);
+      }
+    }catch(e){console.warn("PDF generatie mislukt:",e)}
+  }
   fetch(ajaxUrl,{method:"POST",body:formData})
     .then(r=>r.json())
     .then(resp=>{
@@ -559,7 +701,7 @@ function submitOffer(){
         const offerNumber=resp.data.offerNumber||"";
         const thankYouUrl=resp.data.thankYouUrl||"";
         $("#offerNumber").value=offerNumber;
-        renderOffer();
+        if(flowMode!=="measure")renderOffer();
         $("#submitStatus").innerHTML=`<span class="ok">${esc(resp.data.message)} Uw referentienummer is: <b>${esc(offerNumber)}</b></span>`;
         if(thankYouUrl){setTimeout(()=>{window.location.href=thankYouUrl},2000)}
       }else{
@@ -573,6 +715,64 @@ function submitOffer(){
 }
 $("#submitOffer").onclick=submitOffer;
 
+const plannerNextBtn=$('#plannerNext');
+if(plannerNextBtn)plannerNextBtn.addEventListener('click',async e=>{
+  if(flowMode==='self'){e.preventDefault();e.stopPropagation();await calculateAndProceed();}
+});
+
+const projectSubmitBtn=$('#projectSubmit');
+if(projectSubmitBtn)projectSubmitBtn.addEventListener('click',e=>{
+  if(flowMode==='measure'){e.preventDefault();e.stopPropagation();
+    const measureBtn=$('#submitMeasure')||$('#projectSubmit');
+    if(measureBtn){
+      measureBtn.id='submitOffer';
+      const p=projectData();
+      if(!p.customerName||!p.customerName.trim())return alert("Vul uw klant / organisatie naam in.");
+      if(!p.email||!p.email.trim())return alert("Vul uw e-mailadres in.");
+      if(!p.prefDate1&&!p.prefDate2&&!p.prefDate3)return alert("Vul minimaal één voorkeursdatum in.");
+      const btn=measureBtn;btn.disabled=true;const orig=btn.textContent;btn.textContent="Verzenden…";
+      const statusDiv=document.createElement('div');statusDiv.className='status';statusDiv.id='submitStatus';statusDiv.style.marginTop='12px';
+      const cardBody=btn.closest('.page-nav')?.previousElementSibling?.querySelector('.card-body')||btn.closest('.page');
+      const existing=$('#submitStatus');
+      if(!existing){btn.closest('.page-nav').parentNode.insertBefore(statusDiv,btn.closest('.page-nav'));}
+      const sd=$('#submitStatus')||statusDiv;
+      sd.innerHTML='<span class="note">Uw aanvraag wordt verzonden…</span>';
+      const formData=new FormData();
+      formData.append("action","gn_submit_offer");
+      formData.append("nonce",gnNonce);
+      formData.append("project_json",JSON.stringify(collectProject()));
+      formData.append("customer_name",p.customerName);
+      formData.append("contact_name",p.contactName);
+      formData.append("email",p.email);
+      formData.append("phone",p.phone);
+      formData.append("address",p.address);
+      formData.append("city",p.city);
+      formData.append("flow_mode","measure");
+      formData.append("pref_date1",p.prefDate1||"");
+      formData.append("pref_date2",p.prefDate2||"");
+      formData.append("pref_date3",p.prefDate3||"");
+      fetch(ajaxUrl,{method:"POST",body:formData})
+        .then(r=>r.json())
+        .then(resp=>{
+          btn.disabled=false;btn.textContent=orig;
+          if(resp.success){
+            const offerNumber=resp.data.offerNumber||"";
+            const thankYouUrl=resp.data.thankYouUrl||"";
+            sd.innerHTML=`<span class="ok">${esc(resp.data.message)} Uw referentienummer is: <b>${esc(offerNumber)}</b></span>`;
+            if(thankYouUrl){setTimeout(()=>{window.location.href=thankYouUrl},2000)}
+          }else{
+            sd.innerHTML=`<span class="warn">${esc(resp.data?.message||"Er is een fout opgetreden.")}</span>`;
+          }
+        })
+        .catch(()=>{
+          btn.disabled=false;btn.textContent=orig;
+          sd.innerHTML='<span class="warn">Er is een fout opgetreden bij het verzenden. Probeer het opnieuw.</span>';
+        });
+    }
+  }
+});
+
 initConfig();
 applyROIProfile();
+initTooltips();
 }

@@ -4,16 +4,40 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
 
 <main class="shell">
 <nav class="tabs no-print">
-  <button class="tab active" data-page="project">1. Project</button>
-  <button class="tab" data-page="planner">2. Snijplanner</button>
-  <button class="tab" data-page="calc">3. Calculatie</button>
-  <button class="tab" data-page="roi">4. ROI-berekening</button>
-  <button class="tab" data-page="offer">5. Offerte</button>
-  <button class="tab hidden" data-page="workorder">6. Werkbon</button>
-  <button class="tab hidden" data-page="exports">7. Export</button>
+  <button class="tab active" data-page="choice">1. Start</button>
+  <button class="tab hidden" data-page="planner">2. Snijplanner</button>
+  <button class="tab hidden" data-page="calc">3. Calculatie</button>
+  <button class="tab hidden" data-page="roi">4. ROI-berekening</button>
+  <button class="tab hidden" data-page="project">5. Project</button>
+  <button class="tab hidden" data-page="offer">6. Offerte</button>
+  <button class="tab hidden" data-page="workorder">7. Werkbon</button>
+  <button class="tab hidden" data-page="exports">8. Export</button>
 </nav>
 
-<section class="page active" id="page-project">
+<section class="page active" id="page-choice">
+<div class="grid">
+  <article class="card span-12">
+    <div class="card-head"><h2>Welkom bij GlassNext Suite</h2></div>
+    <div class="card-body">
+      <p style="font-size:15px;line-height:1.6;margin-bottom:20px">Wilt u uw beglazing isoleren met Nano-EcoLine Climate GlassShield? Kies hieronder hoe u wilt beginnen.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px" class="choice-grid">
+        <button class="btn choice-btn" id="choiceMeasure" type="button" style="padding:24px;text-align:left;line-height:1.6">
+          <div style="font-size:18px;font-weight:800;margin-bottom:8px">Laten opmeten</div>
+          <div style="font-size:14px;opacity:.9">Wij komen bij u langs om de ruiten professioneel op te meten.</div>
+          <div style="font-size:20px;font-weight:800;margin-top:12px">€ 149,-</div>
+        </button>
+        <button class="btn secondary choice-btn" id="choiceSelf" type="button" style="padding:24px;text-align:left;line-height:1.6">
+          <div style="font-size:18px;font-weight:800;margin-bottom:8px">Zelf opmeten</div>
+          <div style="font-size:14px;opacity:.9">U meet zelf de ruiten op en wij maken het snijplan en offerte.</div>
+          <div style="font-size:14px;font-weight:700;margin-top:12px">Gratis</div>
+        </button>
+      </div>
+    </div>
+  </article>
+</div>
+</section>
+
+<section class="page" id="page-project">
 <div class="grid">
   <article class="card span-12">
     <div class="card-head"><h2>Projectgegevens</h2><span class="pill">vul in voor offerte</span></div>
@@ -26,6 +50,15 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
         <div><label>Telefoon</label><input id="phone"></div>
         <div><label>Projectadres</label><input id="address"></div>
         <div><label>Postcode en plaats</label><input id="city"></div>
+      </div>
+      <div class="measure-only hidden" id="measureDates" style="margin-top:16px">
+        <h3 style="margin:0 0 10px">Voorkeursdatums voor inmeten</h3>
+        <div class="fields three">
+          <div><label>Voorkeursdatum 1</label><input id="prefDate1" type="date"></div>
+          <div><label>Voorkeursdatum 2</label><input id="prefDate2" type="date"></div>
+          <div><label>Voorkeursdatum 3</label><input id="prefDate3" type="date"></div>
+        </div>
+        <p class="note" style="margin-top:8px">Wij plannen de inmeting op basis van uw voorkeursdatums. U ontvangt een bevestiging met de definitieve afspraak.</p>
       </div>
       <div style="margin-top:12px"><label>Projectomschrijving / situatie</label><textarea id="projectDescription" placeholder="Bijvoorbeeld: bestaande beglazing voorzien van Nano-EcoLine Climate GlassShield."></textarea></div>
       <div style="margin-top:12px"><label>Bijzonderheden</label><textarea id="projectNotes" placeholder="Bereikbaarheid, planning, glasconditie, werktijden, aandachtspunten..."></textarea></div>
@@ -50,14 +83,14 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
   </article>
 </div>
 <div class="page-nav no-print">
-  <button class="btn secondary nav-prev" type="button" disabled>Vorige</button>
-  <button class="btn nav-next" type="button" data-target="planner">Volgende</button>
+  <button class="btn secondary nav-prev" type="button" data-target="roi">Vorige</button>
+  <button class="btn nav-next" id="projectSubmit" type="button" data-target="offer">Volgende</button>
 </div>
 </section>
 
 <section class="page" id="page-planner">
 <div class="grid">
-  <article class="card span-12">
+  <article class="card span-12 self-flow-only hidden">
     <div class="card-head"><h2>Aanbrengen folie</h2></div>
     <div class="card-body">
       <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center">
@@ -80,11 +113,19 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
       <div class="toolbar no-print"><button class="btn ghost" id="addPane">+ Ruitmaat</button><button class="btn secondary" id="demoPanes">Demo laden</button></div>
     </div>
     <div class="card-body table-wrap">
-      <table id="paneTable"><thead><tr><th>Kenmerk</th><th>Breedte cm</th><th>Hoogte cm</th><th>Aantal</th><th>Rotatie</th><th>Ruimte / verdieping</th><th></th></tr></thead><tbody></tbody></table>
+      <table id="paneTable"><thead><tr>
+        <th><span class="th-label">Kenmerk</span> <span class="tooltip-icon" data-tooltip-col="kenmerk">&#9432;</span></th>
+        <th><span class="th-label">Breedte cm</span> <span class="tooltip-icon" data-tooltip-col="breedte">&#9432;</span></th>
+        <th><span class="th-label">Hoogte cm</span> <span class="tooltip-icon" data-tooltip-col="hoogte">&#9432;</span></th>
+        <th><span class="th-label">Aantal</span> <span class="tooltip-icon" data-tooltip-col="aantal">&#9432;</span></th>
+        <th><span class="th-label">Rotatie</span> <span class="tooltip-icon" data-tooltip-col="rotatie">&#9432;</span></th>
+        <th><span class="th-label">Ruimte / verdieping</span> <span class="tooltip-icon" data-tooltip-col="ruimte">&#9432;</span></th>
+        <th></th>
+      </tr></thead><tbody></tbody></table>
     </div>
   </article>
 
-  <article class="card span-12">
+  <article class="card span-12 self-flow-only hidden">
     <div class="card-head"><h2>Optimale indeling</h2>
       <div class="toolbar no-print"><button class="btn" id="calculatePlan">Bereken snijplan</button><button class="btn secondary" id="exportCSVTop">CSV plotter</button><button class="btn secondary" id="planPDF">Snijplan PDF</button></div>
     </div>
@@ -98,14 +139,14 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
     </div>
   </article>
 
-  <article class="card span-12">
+  <article class="card span-12 self-flow-only hidden">
     <div class="card-head"><h2>Stukkenlijst</h2></div>
     <div class="card-body table-wrap" id="pieceReport">Nog geen snijplan berekend.</div>
   </article>
 </div>
 <div class="page-nav no-print">
-  <button class="btn secondary nav-prev" type="button" data-target="project">Vorige</button>
-  <button class="btn nav-next" type="button" data-target="calc">Volgende</button>
+  <button class="btn secondary nav-prev" type="button" data-target="choice">Vorige</button>
+  <button class="btn nav-next" id="plannerNext" type="button" data-target="calc">Volgende</button>
 </div>
 </section>
 
@@ -237,7 +278,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
 </div>
 <div class="page-nav no-print">
   <button class="btn secondary nav-prev" type="button" data-target="calc">Vorige</button>
-  <button class="btn nav-next" type="button" data-target="offer">Volgende</button>
+  <button class="btn nav-next" type="button" data-target="project">Volgende</button>
 </div>
 </section>
 
@@ -250,10 +291,6 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
   <article class="card span-12">
     <div class="card-head"><h2>Offerte aanvragen</h2></div>
     <div class="card-body">
-      <div class="summary-box" style="margin-bottom:14px;line-height:1.6">
-        <p>Deze scenarioanalyse is afhankelijk van de werkelijke glasopbouw, gebouwcondities, installaties, energieprijzen en het gebruik. Aan de uitkomst kunnen geen gegarandeerde besparingen worden ontleend.</p>
-        <p>Deze offerte is gebaseerd op de ingevoerde ruitmaten en het berekende snijplan. Definitieve maatvoering en geschiktheid van de beglazing worden vóór uitvoering gecontroleerd.</p>
-      </div>
       <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;cursor:pointer;font-size:13px;line-height:1.5">
         <input type="checkbox" id="offerConsent" style="width:auto;margin-top:3px">
         <span>Ik begrijp dat deze offerte een scenarioanalyse is afhankelijk van de werkelijke glasopbouw, gebouwcondities, installaties, energieprijzen en het gebruik. Aan de uitkomst kunnen geen gegarandeerde besparingen worden ontleend. Deze offerte is gebaseerd op de ingevoerde ruitmaten en het berekende snijplan. Definitieve maatvoering en geschiktheid van de beglazing worden vóór uitvoering gecontroleerd.</span>
@@ -263,7 +300,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
   </article>
 </div>
 <div class="page-nav no-print">
-  <button class="btn secondary nav-prev" type="button" data-target="roi">Vorige</button>
+  <button class="btn secondary nav-prev" type="button" data-target="project">Vorige</button>
   <button class="btn nav-next" id="submitOffer" type="button" data-target="workorder" disabled>Offerte aanvragen</button>
 </div>
 </section>

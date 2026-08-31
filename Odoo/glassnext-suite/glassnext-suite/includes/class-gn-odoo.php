@@ -339,7 +339,7 @@ class GN_Odoo {
      *
      * @return array{success:bool, order_id:?int, partner_id:?int, error:?string}
      */
-    public function sync_order($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city, $attachments = []) {
+    public function sync_order($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city, $attachments = [], $flow_mode = 'self', $pref_date1 = '', $pref_date2 = '', $pref_date3 = '') {
         if (!$this->is_enabled()) {
             return ['success' => false, 'order_id' => null, 'partner_id' => null, 'error' => 'Odoo-integratie niet geconfigureerd of uitgeschakeld.'];
         }
@@ -367,21 +367,50 @@ class GN_Odoo {
 
             $install_mode = $decoded['values']['installMode'] ?? 'professional';
 
-            if ($roll_area > 0) {
-                $this->add_fixed_line($order_id, $product_material, $roll_area);
-            }
-            if ($roll_length > 0 && $install_mode !== 'self') {
-                $this->add_fixed_line($order_id, $product_mount, $roll_length);
-            }
-            if ($pieces > 0) {
-                $this->add_fixed_line($order_id, $product_cut, $pieces);
-            }
+            if ($flow_mode === 'measure') {
+                $product_measure = (int) get_option('gn_odoo_product_measure', 0);
+                if ($product_measure > 0) {
+                    $this->add_fixed_line($order_id, $product_measure, 1);
+                }
+                $date_note = "Voorkeursdatums inmeten:\n";
+                $date_note .= "1: " . $pref_date1 . "\n";
+                $date_note .= "2: " . $pref_date2 . "\n";
+                $date_note .= "3: " . $pref_date3;
+                $this->call('sale.order', 'write', [[$order_id], ['note' => $date_note]]);
 
-            foreach (($decoded['otherCosts'] ?? []) as $cost) {
-                $desc = $cost['description'] ?? '';
-                $amount = floatval($cost['amount'] ?? 0);
-                if ($desc !== '' && $amount > 0) {
-                    $this->add_free_line($order_id, $desc, 1, $amount);
+                if (get_option('gn_odoo_create_calendar_event', '') === '1' && $pref_date1) {
+                    try {
+                        $this->create_calendar_event($partner_id, $offer_number, $pref_date1, $customer_name);
+                    } catch (Exception $ce) {
+                        $this->debug_log('calendar event error: ' . $ce->getMessage());
+                    }
+                }
+            } else {
+                $product_material = (int) get_option('gn_odoo_product_material', 3);
+                $product_mount    = (int) get_option('gn_odoo_product_mount', 5);
+                $product_cut      = (int) get_option('gn_odoo_product_cut', 85);
+
+                if ($roll_area > 0) {
+                    $this->add_fixed_line($order_id, $product_material, $roll_area);
+                }
+                if ($roll_length > 0 && $install_mode !== 'self') {
+                    $this->add_fixed_line($order_id, $product_mount, $roll_length);
+                }
+                if ($pieces > 0) {
+                    $this->add_fixed_line($order_id, $product_cut, $pieces);
+                }
+
+                foreach (($decoded['otherCosts'] ?? []) as $cost) {
+                    $desc = $cost['description'] ?? '';
+                    $amount = floatval($cost['amount'] ?? 0);
+                    if ($desc !== '' && $amount > 0) {
+                        $this->add_free_line($order_id, $desc, 1, $amount);
+                    }
+                }
+
+                $product_voorrijd = (int) get_option('gn_odoo_product_voorrijd', 86);
+                if ($product_voorrijd > 0) {
+                    $this->add_fixed_line($order_id, $product_voorrijd, 1);
                 }
             }
 
@@ -414,6 +443,23 @@ class GN_Odoo {
             'res_model' => 'sale.order',
             'res_id'    => $order_id,
             'mimetype'  => $mimetype,
+        ]]);
+    }
+
+    /**
+     * Maak een concept agenda-afspraak in Odoo voor het inmeten.
+     */
+    private function create_calendar_event($partner_id, $offer_number, $date, $customer_name) {
+        $this->debug_log('create_calendar_event: partner=' . $partner_id . ' date=' . $date . ' offer=' . $offer_number);
+        $start = $date . ' 09:00:00';
+        $stop = $date . ' 10:00:00';
+        $this->call('calendar.event', 'create', [[
+            'name'      => 'Inmeten ' . $customer_name . ' (' . $offer_number . ')',
+            'partner_ids' => [[$partner_id]],
+            'start'     => $start,
+            'stop'      => $stop,
+            'allday'    => false,
+            'description' => 'Concept-afspraak voor inmeten. Voorkeursdatum van klant.',
         ]]);
     }
 

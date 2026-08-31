@@ -22,7 +22,7 @@
 
 #glassnext-app .shell{max-width:1480px;margin:auto;padding:18px}
 #glassnext-app .tabs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
-#glassnext-app .tab{border:1px solid #c9d8e4;background:#fff;color:var(--navy);padding:10px 13px;border-radius:9px;font-weight:700;cursor:pointer}
+#glassnext-app .tab{border:1px solid #c9d8e4;background:#fff;color:var(--navy);padding:10px 13px;border-radius:9px;font-weight:700;cursor:default}
 #glassnext-app .tab.active{background:var(--blue);color:white;border-color:var(--blue)}
 #glassnext-app .page{display:none}
 #glassnext-app .page.active{display:block}
@@ -86,6 +86,14 @@
 #glassnext-app .signature{border-top:1px solid #8da0ad;padding-top:7px;min-height:70px}
 #glassnext-app .pill{display:inline-block;padding:4px 9px;border-radius:999px;background:#e8f4fc;color:#176999;font-size:12px;font-weight:750}
 #glassnext-app .hidden{display:none!important}
+#glassnext-app .tooltip-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--blue2);color:#fff;font-size:10px;cursor:pointer;margin-left:4px;vertical-align:middle}
+#glassnext-app .tooltip-popover{position:fixed;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(15,36,52,.15);padding:14px;max-width:300px;font-size:13px;line-height:1.5;color:var(--text);z-index:9999}
+#glassnext-app .tooltip-popover p{margin:0}
+#glassnext-app .tooltip-popover img{max-width:100%;border-radius:6px;margin-bottom:8px;display:block}
+#glassnext-app .choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+#glassnext-app .measure-only{display:none}
+#glassnext-app .measure-only:not(.hidden){display:block}
+@media(max-width:650px){#glassnext-app .choice-grid{grid-template-columns:1fr}}
 @media(max-width:950px){
   #glassnext-app .span-8,#glassnext-app .span-7,#glassnext-app .span-6,#glassnext-app .span-5,#glassnext-app .span-4{grid-column:span 12}
   #glassnext-app .fields.three{grid-template-columns:1fr 1fr}

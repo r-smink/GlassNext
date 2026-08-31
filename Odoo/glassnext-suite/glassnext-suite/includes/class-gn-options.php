@@ -88,6 +88,24 @@ class GN_Options {
             'gn_odoo_product_material' => '3',
             'gn_odoo_product_mount'    => '5',
             'gn_odoo_product_cut'      => '85',
+            'gn_odoo_product_voorrijd' => '86',
+            'gn_odoo_product_measure'  => '',
+            'gn_odoo_create_calendar_event' => '',
+            'gn_measure_price'         => '149',
+
+            // Snijplanner tooltips
+            'gn_tooltip_kenmerk_text'  => 'Een unieke naam of nummer voor deze ruit, bijv. "R1" of "Raam woonkamer".',
+            'gn_tooltip_kenmerk_image' => '',
+            'gn_tooltip_breedte_text'  => 'De breedte van de ruit in centimeters, gemeten aan de binnenzijde van de sponning.',
+            'gn_tooltip_breedte_image' => '',
+            'gn_tooltip_hoogte_text'   => 'De hoogte van de ruit in centimeters, gemeten aan de binnenzijde van de sponning.',
+            'gn_tooltip_hoogte_image'  => '',
+            'gn_tooltip_aantal_text'   => 'Het aantal ruiten met deze afmetingen.',
+            'gn_tooltip_aantal_image'  => '',
+            'gn_tooltip_rotatie_text'  => 'Of de ruit 90 graden gedraaid op de rol geplaatst mag worden voor optimale sneding.',
+            'gn_tooltip_rotatie_image' => '',
+            'gn_tooltip_ruimte_text'   => 'De ruimte of verdieping waar deze ruit zich bevindt, voor de werkbon en planning.',
+            'gn_tooltip_ruimte_image'  => '',
 
             // Thank you page
             'gn_thankyou_url' => '',
@@ -148,6 +166,14 @@ class GN_Options {
             'gn_makecom_webhook_url',
             'gn_odoo_enabled', 'gn_odoo_url', 'gn_odoo_db', 'gn_odoo_login', 'gn_odoo_api_key', 'gn_odoo_uid',
             'gn_odoo_product_material', 'gn_odoo_product_mount', 'gn_odoo_product_cut',
+            'gn_odoo_product_voorrijd', 'gn_odoo_product_measure', 'gn_odoo_create_calendar_event',
+            'gn_measure_price',
+            'gn_tooltip_kenmerk_text', 'gn_tooltip_kenmerk_image',
+            'gn_tooltip_breedte_text', 'gn_tooltip_breedte_image',
+            'gn_tooltip_hoogte_text', 'gn_tooltip_hoogte_image',
+            'gn_tooltip_aantal_text', 'gn_tooltip_aantal_image',
+            'gn_tooltip_rotatie_text', 'gn_tooltip_rotatie_image',
+            'gn_tooltip_ruimte_text', 'gn_tooltip_ruimte_image',
             'gn_thankyou_url',
         ];
 
@@ -166,6 +192,7 @@ class GN_Options {
             <button type="button" class="gn-tab-link" data-tab="roi-tech">ROI technisch</button>
             <button type="button" class="gn-tab-link" data-tab="roi-finance">ROI financieel</button>
             <button type="button" class="gn-tab-link" data-tab="offer">Offerte</button>
+            <button type="button" class="gn-tab-link" data-tab="tooltips">Snijplanner tooltips</button>
             <button type="button" class="gn-tab-link" data-tab="email">E-mail</button>
             <button type="button" class="gn-tab-link" data-tab="odoo">Odoo / Make.com</button>
         </nav>
@@ -245,6 +272,8 @@ class GN_Options {
                             <option value="complex" <?php selected(get_option('gn_mount_class', 'average'), 'complex'); ?>>Complex</option>
                             <option value="very" <?php selected(get_option('gn_mount_class', 'average'), 'very'); ?>>Zeer complex</option>
                         </select>
+                        <input type="hidden" id="gn_mount_selected_price" name="gn_mount_selected_price" value="<?php echo esc_attr(get_option('gn_mount_selected_price', '')); ?>">
+                        <p class="description">De montagetarief voor de gekozen klasse wordt automatisch ingesteld op basis van de tarieven hierboven.</p>
                     </td></tr>
                 </table>
 
@@ -284,6 +313,42 @@ class GN_Options {
                 <table class="form-table">
                     <tr><th><label for="gn_offer_prefix">Voorvoegsel offertenummer</label></th><td><input type="text" id="gn_offer_prefix" name="gn_offer_prefix" value="<?php echo esc_attr(get_option('gn_offer_prefix', 'GNW')); ?>" class="regular-text"><p class="description">Het jaar en volgnummer worden automatisch toegevoegd, bijv. GNW-2026-001.</p></td></tr>
                     <tr><th><label for="gn_thankyou_url">Thank you pagina URL</label></th><td><input type="url" id="gn_thankyou_url" name="gn_thankyou_url" value="<?php echo esc_attr(get_option('gn_thankyou_url', '')); ?>" class="regular-text" placeholder="https://voorbeeld.nl/bedankt"><p class="description">Vul de URL in van de pagina waar de klant naartoe wordt geleid na het indienen van de offerte aanvraag. Leeg = geen redirect, de klant blijft op de tool pagina.</p></td></tr>
+                </table>
+
+                </div>
+
+                <div class="gn-tab-panel" data-tab="tooltips">
+                <h2 class="title">Snijplanner tooltips</h2>
+                <p class="description" style="margin-bottom:15px">Deze teksten en afbeeldingen verschijnen als tooltip (ⓘ) bij de kolomkoppen in de snijplanner tabel. Laat een tekst leeg om de tooltip voor die kolol uit te schakelen.</p>
+                <table class="form-table">
+                    <?php
+                    $tooltip_cols = [
+                        'kenmerk'  => 'Kenmerk',
+                        'breedte'  => 'Breedte cm',
+                        'hoogte'   => 'Hoogte cm',
+                        'aantal'   => 'Aantal',
+                        'rotatie'  => 'Rotatie',
+                        'ruimte'   => 'Ruimte / verdieping',
+                    ];
+                    foreach ($tooltip_cols as $col => $label) :
+                        $text_val = get_option("gn_tooltip_{$col}_text", '');
+                        $img_id   = get_option("gn_tooltip_{$col}_image", '');
+                        $img_url  = $img_id ? wp_get_attachment_url($img_id) : '';
+                    ?>
+                    <tr><th><label for="gn_tooltip_<?php echo $col; ?>_text"><?php echo $label; ?></label></th><td>
+                        <textarea id="gn_tooltip_<?php echo $col; ?>_text" name="gn_tooltip_<?php echo $col; ?>_text" rows="3" class="large-text"><?php echo esc_textarea($text_val); ?></textarea>
+                        <div style="margin-top:8px">
+                            <div id="gn-tooltip-<?php echo $col; ?>-preview" style="margin-bottom:8px">
+                                <?php if ($img_url) : ?>
+                                    <img src="<?php echo esc_url($img_url); ?>" style="max-height:80px;max-width:200px;border:1px solid #ddd;padding:4px;background:#fff;" />
+                                <?php endif; ?>
+                            </div>
+                            <input type="hidden" id="gn_tooltip_<?php echo $col; ?>_image" name="gn_tooltip_<?php echo $col; ?>_image" value="<?php echo esc_attr($img_id); ?>">
+                            <button type="button" class="button gn-choose-tooltip-img" data-col="<?php echo $col; ?>">Afbeelding kiezen</button>
+                            <button type="button" class="button gn-remove-tooltip-img" data-col="<?php echo $col; ?>" <?php echo $img_id ? '' : 'style="display:none;"'; ?>>Afbeelding verwijderen</button>
+                        </div>
+                    </td></tr>
+                    <?php endforeach; ?>
                 </table>
 
                 </div>
@@ -352,7 +417,13 @@ class GN_Options {
                     <tr><th><label for="gn_odoo_product_material">Product-ID: GlassShield per m²</label></th><td><input type="number" id="gn_odoo_product_material" name="gn_odoo_product_material" value="<?php echo esc_attr(get_option('gn_odoo_product_material', '3')); ?>" class="small-text"><p class="description">Aantal = netto rolverbruik (m²).</p></td></tr>
                     <tr><th><label for="gn_odoo_product_mount">Product-ID: Aanbrengen GlassShield per m²</label></th><td><input type="number" id="gn_odoo_product_mount" name="gn_odoo_product_mount" value="<?php echo esc_attr(get_option('gn_odoo_product_mount', '5')); ?>" class="small-text"><p class="description">Aantal = rollengte (m²).</p></td></tr>
                     <tr><th><label for="gn_odoo_product_cut">Product-ID: Programmeren en voorsnijden</label></th><td><input type="number" id="gn_odoo_product_cut" name="gn_odoo_product_cut" value="<?php echo esc_attr(get_option('gn_odoo_product_cut', '85')); ?>" class="small-text"><p class="description">Aantal = aantal stuks.</p></td></tr>
-                    <tr><th></th><td><p class="description">Voor al deze 3 producten wordt geen prijs meegestuurd; Odoo gebruikt de eigen verkoopprijs van het product. "Overige kosten" (hierboven bij Prijsinstellingen) worden wel als losse regel met eigen prijs meegestuurd.</p></td></tr>
+                    <tr><th><label for="gn_odoo_product_voorrijd">Product-ID: Voorrijdkosten</label></th><td><input type="number" id="gn_odoo_product_voorrijd" name="gn_odoo_product_voorrijd" value="<?php echo esc_attr(get_option('gn_odoo_product_voorrijd', '86')); ?>" class="small-text"><p class="description">Wordt altijd als vaste regel toegevoegd. Prijs = "nader te berekenen" (stel in Odoo in).</p></td></tr>
+                    <tr><th><label for="gn_odoo_product_measure">Product-ID: Laten opmeten (€149)</label></th><td><input type="number" id="gn_odoo_product_measure" name="gn_odoo_product_measure" value="<?php echo esc_attr(get_option('gn_odoo_product_measure', '')); ?>" class="small-text"><p class="description">Product-ID voor de "Laten opmeten" service. Wordt gebruikt bij de inmeet-aanvraag flow.</p></td></tr>
+                    <tr><th><label for="gn_odoo_create_calendar_event">Agenda-afspraak aanmaken</label></th><td>
+                        <label><input type="checkbox" id="gn_odoo_create_calendar_event" name="gn_odoo_create_calendar_event" value="1" <?php checked(get_option('gn_odoo_create_calendar_event', ''), '1'); ?>> Bij "Laten opmeten" automatisch een concept-agenda-afspraak aanmaken in Odoo voor de eerste voorkeursdatum.</label>
+                    </td></tr>
+                    <tr><th><label for="gn_measure_price">Prijs "Laten opmeten" (€)</label></th><td><input type="number" step="0.01" id="gn_measure_price" name="gn_measure_price" value="<?php echo esc_attr(get_option('gn_measure_price', '149')); ?>" class="small-text"></td></tr>
+                    <tr><th></th><td><p class="description">Voor alle product-ID's wordt geen prijs meegestuurd; Odoo gebruikt de eigen verkoopprijs van het product. "Overige kosten" (hierboven bij Prijsinstellingen) worden wel als losse regel met eigen prijs meegestuurd.</p></td></tr>
                     <tr><th>Verbinding testen</th><td>
                         <button type="button" class="button" id="gn-test-odoo-connection">Test Odoo-verbinding</button>
                         <span id="gn-test-odoo-spinner" class="spinner" style="float:none;"></span>
@@ -393,6 +464,32 @@ class GN_Options {
                             $btn.prop('disabled', false);
                             $spinner.removeClass('is-active');
                         });
+                    });
+                })(jQuery);
+
+                (function($){
+                    $('.gn-choose-tooltip-img').on('click', function(e){
+                        e.preventDefault();
+                        var col = $(this).data('col');
+                        var frame = wp.media({
+                            title: 'Kies een afbeelding voor de tooltip',
+                            library: { type: 'image' },
+                            multiple: false
+                        });
+                        frame.on('select', function(){
+                            var attachment = frame.state().get('selection').first().toJSON();
+                            $('#gn-tooltip-' + col + '-preview').html('<img src="' + attachment.url + '" style="max-height:80px;max-width:200px;border:1px solid #ddd;padding:4px;background:#fff;" />');
+                            $('#gn_tooltip_' + col + '_image').val(attachment.id);
+                            $('.gn-remove-tooltip-img[data-col="' + col + '"]').show();
+                        });
+                        frame.open();
+                    });
+                    $('.gn-remove-tooltip-img').on('click', function(e){
+                        e.preventDefault();
+                        var col = $(this).data('col');
+                        $('#gn-tooltip-' + col + '-preview').html('');
+                        $('#gn_tooltip_' + col + '_image').val('');
+                        $(this).hide();
                     });
                 })(jQuery);
                 </script>

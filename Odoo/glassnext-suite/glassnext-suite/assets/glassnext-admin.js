@@ -66,4 +66,20 @@ jQuery(function($){
     $('#gn-email-logo-preview').html('');
     $('#gn-remove-logo').hide();
   });
+
+  // Sync gn_mount_selected_price based on selected mount class and rate
+  function syncMountSelectedPrice() {
+    var cls = $('#gn_mount_class').val();
+    var rateMap = {
+      easy: $('input[name="gn_mount_rate_easy"]').val(),
+      average: $('input[name="gn_mount_rate_average"]').val(),
+      complex: $('input[name="gn_mount_rate_complex"]').val(),
+      very: $('input[name="gn_mount_rate_very"]').val()
+    };
+    var rate = rateMap[cls] || 45;
+    $('#gn_mount_selected_price').val(rate);
+  }
+  $('#gn_mount_class').on('change', syncMountSelectedPrice);
+  $('input[name="gn_mount_rate_easy"],input[name="gn_mount_rate_average"],input[name="gn_mount_rate_complex"],input[name="gn_mount_rate_very"]').on('input change', syncMountSelectedPrice);
+  syncMountSelectedPrice();
 });
