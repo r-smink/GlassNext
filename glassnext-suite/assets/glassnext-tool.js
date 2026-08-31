@@ -443,10 +443,10 @@ function collectProject(){
   return{version:"GlassNext Suite v4.4-WP",savedAt:new Date().toISOString(),values,panes,otherCosts:readOtherCosts(),workorderData,exportData};
 }
 function renderWorkorderHTML(){
-  if(!lastPlan)return"";
+  if(!lastPlan)return null;
   const p=projectData(),s=lastPlan.stats;
   const grouped={};lastPlan.placed.forEach(x=>{const k=x.item.room||"Niet opgegeven";(grouped[k]??=[]).push(x)});
-  return JSON.stringify({customerName:p.customerName,contactName:p.contactName,address:p.address,city:p.city,phone:p.phone,offerNumber:p.offerNumber,mountClass:mountClassText(),pieces:lastPlan.placed.length,netArea:s.netArea,rollArea:s.rollArea,rollLength:lastPlan.totalLen/1000,rooms:Object.entries(grouped).map(([room,arr])=>({room,count:arr.length,ids:[...new Set(arr.map(x=>x.item.baseId))]}))});
+  return {customerName:p.customerName,contactName:p.contactName,address:p.address,city:p.city,phone:p.phone,offerNumber:p.offerNumber,mountClass:mountClassText(),pieces:lastPlan.placed.length,netArea:s.netArea,rollArea:s.rollArea,rollLength:lastPlan.totalLen/1000,rooms:Object.entries(grouped).map(([room,arr])=>({room,count:arr.length,ids:[...new Set(arr.map(x=>x.item.baseId))]}))};
 }
 function renderExportSummary(){
   const p=projectData();

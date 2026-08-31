@@ -773,6 +773,12 @@ function saveProject(){downloadBlob(new Blob([JSON.stringify(collectProject(),nu
 function openProjectFile(file){
   const reader=new FileReader();reader.onload=()=>{let raw="",d=null;try{
     raw=String(reader.result||"").replace(/^\uFEFF/,"").trim();
+    // Fix: workorderData may contain unescaped inner JSON (WP bug). Remove it before parsing.
+    const wdStart=raw.indexOf('"workorderData":');
+    if(wdStart!==-1){
+      const wdEnd=raw.indexOf(',"exportData"',wdStart);
+      if(wdEnd!==-1)raw=raw.substring(0,wdStart)+raw.substring(wdEnd+1);
+    }
     console.log("openProjectFile:", file.name, raw.substring(0,200));
     d=JSON.parse(raw);
     console.log("parsed:", d);
@@ -796,7 +802,7 @@ function openProjectFile(file){
     else if(v && num(v.otherCost)>0)setOtherCosts([{description:"Overige projectkosten",amount:num(v.otherCost)}]);
     else setOtherCosts([]);
     paneBody.innerHTML="";(d.panes||[]).forEach(addPaneRow);lastPlan=null;lastCalc=null;lastROI=null;$("#planMetrics").innerHTML="";$("#pieceReport").textContent="Project geopend. Bereken het snijplan opnieuw.";activatePage("project")
-  }catch(e){console.error(e,d,raw);alert("Dit projectbestand kon niet worden geopend: "+e.message+"\n\nKijk in de browserconsole (F12 > Console) voor de ruwe data.");}};reader.readAsText(file);
+  }catch(e){console.error(e,d,raw);const pos=e.message.match(/position (\d+)/);let ctx="";if(pos){const p=parseInt(pos[1]);ctx="\n\nRond positie "+p+":\n"+raw.substring(Math.max(0,p-40),p+40);}alert("Dit projectbestand kon niet worden geopend: "+e.message+ctx+"\n\nKijk in de browserconsole (F12 > Console) voor de ruwe data.");}};reader.readAsText(file);
 }
 $("#projectFile").onchange=e=>{if(e.target.files[0])openProjectFile(e.target.files[0]);e.target.value=""};
 $("#saveProject").onclick=saveProject;$("#exportProject").onclick=saveProject;$("#loadProject").onclick=()=>$("#projectFile").click();$("#importProject").onclick=()=>$("#projectFile").click();

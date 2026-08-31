@@ -39,6 +39,8 @@ function initConfig(){
   const otherCosts=O.gn_other_costs; if(Array.isArray(otherCosts))setOtherCosts(otherCosts);
 }
 
+const PAGES=["project","planner","calc","roi","offer","workorder","exports"];
+function visiblePages(){return PAGES.filter(p=>{const t=$(`.tab[data-page="${p}"]`);return t&&!t.classList.contains("hidden")})}
 function activatePage(name){
   $$(".tab").forEach(b=>b.classList.toggle("active",b.dataset.page===name));
   $$(".page").forEach(p=>p.classList.toggle("active",p.id===`page-${name}`));
@@ -46,8 +48,48 @@ function activatePage(name){
   if(name==="offer")renderOffer();
   if(name==="workorder")renderWorkorder();
   if(name==="exports")renderExportSummary();
+  renderNavButtons(name);
 }
+function renderNavButtons(current){
+  const vis=visiblePages();
+  const idx=vis.indexOf(current);
+  const prev=$$("#page-"+current+" .nav-prev")[0];
+  const next=$$("#page-"+current+" .nav-next")[0];
+  if(prev){
+    const prevPage=idx>0?vis[idx-1]:null;
+    prev.disabled=!prevPage;
+    if(prevPage)prev.dataset.target=prevPage;
+  }
+  if(next){
+    const nextPage=idx>=0&&idx<vis.length-1?vis[idx+1]:null;
+    next.disabled=!nextPage;
+    if(nextPage)next.dataset.target=nextPage;
+    if(current==="offer"&&next.id==="submitOffer"){
+      const cb=$("#offerConsent");
+      if(cb&&!cb.checked)next.disabled=true;
+    }
+  }
+}
+function installMode(){return document.querySelector('input[name="installMode"]:checked')?.value||"professional"}
+$$('input[name="installMode"]').forEach(r=>r.addEventListener("change",()=>{
+  if(lastPlan){calculatePrices();if(lastROI)calculateROI()}
+  if(typeof renderOffer==="function"&&$("#offerDoc").innerHTML)renderOffer();
+}));
 $$(".tab").forEach(b=>b.onclick=()=>activatePage(b.dataset.page));
+document.addEventListener("click",e=>{
+  const btn=e.target.closest(".nav-prev, .nav-next");
+  if(!btn||btn.disabled)return;
+  if(btn.id==="submitOffer")return;
+  const t=btn.dataset.target;
+  if(t)activatePage(t);
+});
+const consentCb=$("#offerConsent");
+if(consentCb){
+  consentCb.addEventListener("change",()=>{
+    const sb=$("#submitOffer");
+    if(sb)sb.disabled=!consentCb.checked;
+  });
+}
 
 const paneBody=$("#paneTable tbody");
 function addPaneRow(p={}){
@@ -206,12 +248,13 @@ function setOtherCosts(costs){
 function calculatePrices(){
   if(!lastPlan){$("#calcWarning").textContent="Bereken eerst een snijplan.";return null}
   const s=lastPlan.stats,pieces=lastPlan.placed.length,matRate=num($("#materialPrice").value)||0,cutRate=num($("#cutPrice").value)||0,mountRate=selectedMountRate();
+  const selfInstall=installMode()==="self";
   const matGross=s.rollArea*matRate,matDisc=matGross*(num($("#materialDiscount").value)||0)/100;
   const cut=pieces*cutRate,mountArea=$("#mountAreaBasis").value==="gross"?s.grossArea:s.netArea;
-  const mountGross=mountArea*mountRate,mountDisc=mountGross*(num($("#mountDiscount").value)||0)/100;
+  const mountGross=selfInstall?0:mountArea*mountRate,mountDisc=selfInstall?0:mountGross*(num($("#mountDiscount").value)||0)/100;
   const otherCosts=readOtherCosts(),other=otherCosts.reduce((sum,x)=>sum+x.amount,0);
   const subtotal=matGross-matDisc+cut+mountGross-mountDisc+other,vat=subtotal*(num($("#vatRate").value)||0)/100,total=subtotal+vat;
-  lastCalc={matGross,matDisc,cut,mountArea,mountRate,mountGross,mountDisc,other,otherCosts,subtotal,vat,total,vatRate:num($("#vatRate").value)||0,matRate,cutRate,pieces};
+  lastCalc={matGross,matDisc,cut,mountArea,mountRate,mountGross,mountDisc,other,otherCosts,subtotal,vat,total,vatRate:num($("#vatRate").value)||0,matRate,cutRate,pieces,selfInstall};
   $("#calcWarning").innerHTML='<span class="ok">Calculatie bijgewerkt op basis van het actuele snijplan.</span>';
   $("#calcMetrics").innerHTML=`<div class="metric">Netto glas<strong>${fmtN(s.netArea)} m²</strong></div><div class="metric">Te factureren materiaal<strong>${fmtN(s.rollArea)} m²</strong></div><div class="metric">Aantal voorgesneden stukken<strong>${pieces}</strong></div><div class="metric">Montageklasse<strong>${mountClassText()}</strong></div>`;
   const otherRows=otherCosts.filter(x=>x.amount>0).map(x=>`<tr><td>${esc(x.description||"Overige kosten")}</td><td>Overige kosten</td><td></td><td>${fmtMoney(x.amount)}</td></tr>`).join("");
@@ -219,7 +262,7 @@ function calculatePrices(){
     <tr><td>GlassShield materiaal</td><td>${fmtN(s.rollArea)} m² rolverbruik</td><td>${fmtMoney(matRate)}/m²</td><td>${fmtMoney(matGross)}</td></tr>
     ${matDisc?`<tr><td>Materiaalkorting</td><td>${fmtN(num($("#materialDiscount").value),1)}%</td><td></td><td>- ${fmtMoney(matDisc)}</td></tr>`:""}
     <tr><td>Voorsnijden</td><td>${pieces} stukken</td><td>${fmtMoney(cutRate)}/stuk</td><td>${fmtMoney(cut)}</td></tr>
-    <tr><td>Montage – ${mountClassText()}</td><td>${fmtN(mountArea)} m²</td><td>${fmtMoney(mountRate)}/m²</td><td>${fmtMoney(mountGross)}</td></tr>
+    ${selfInstall?"":`<tr><td>Montage – ${mountClassText()}</td><td>${fmtN(mountArea)} m²</td><td>${fmtMoney(mountRate)}/m²</td><td>${fmtMoney(mountGross)}</td></tr>`}
     ${mountDisc?`<tr><td>Montagekorting</td><td>${fmtN(num($("#mountDiscount").value),1)}%</td><td></td><td>- ${fmtMoney(mountDisc)}</td></tr>`:""}
     ${otherRows}
     <tr class="total-row"><td colspan="3">Totaal excl. btw</td><td>${fmtMoney(subtotal)}</td></tr>
@@ -366,11 +409,11 @@ function renderOffer(){
     <tr><td>${fmtN(s.rollArea)} m² Nano-EcoLine Climate GlassShield à ${fmtMoney(c.matRate)}/m²</td><td>${fmtMoney(c.matGross)}</td></tr>
     ${c.matDisc?`<tr><td>Projectkorting materiaal</td><td>- ${fmtMoney(c.matDisc)}</td></tr>`:""}
     <tr><td>Voorsnijden ${c.pieces} stuks à ${fmtMoney(c.cutRate)}</td><td>${fmtMoney(c.cut)}</td></tr>
-    <tr><td>Aanbrengen GlassShield – montageklasse ${mountClassText()} (${fmtN(c.mountArea)} m² à ${fmtMoney(c.mountRate)}/m²)</td><td>${fmtMoney(c.mountGross)}</td></tr>
-    ${c.mountDisc?`<tr><td>Projectkorting montage</td><td>- ${fmtMoney(c.mountDisc)}</td></tr>`:""}
+    ${c.selfInstall?"":`<tr><td>Aanbrengen GlassShield – montageklasse ${mountClassText()} (${fmtN(c.mountArea)} m² à ${fmtMoney(c.mountRate)}/m²)</td><td>${fmtMoney(c.mountGross)}</td></tr>`}
+    ${c.selfInstall?"":(c.mountDisc?`<tr><td>Projectkorting montage</td><td>- ${fmtMoney(c.mountDisc)}</td></tr>`:"")}
     ${(c.otherCosts||[]).filter(x=>x.amount>0).map(x=>`<tr><td>${esc(x.description||"Overige kosten")}</td><td>${fmtMoney(x.amount)}</td></tr>`).join("")}
     <tr class="total-row"><td>Totaal excl. btw</td><td>${fmtMoney(c.subtotal)}</td></tr><tr><td>${fmtN(c.vatRate,1)}% btw</td><td>${fmtMoney(c.vat)}</td></tr><tr class="grand-row"><td>Totaal incl. btw</td><td>${fmtMoney(c.total)}</td></tr></tbody></table>
-    <h3>Werkzaamheden montage</h3><ul><li>Bevochtigen en reinigen van de glasoppervlakken</li><li>Voorbereiden en positioneren van GlassShield</li><li>Verwijderen van vocht en luchtinsluitingen</li><li>Schoonsnijden en afwerken van de folie</li><li>Reinigen van glas, kozijnen en vensterbanken</li></ul>
+    ${c.selfInstall?"":`<h3>Werkzaamheden montage</h3><ul><li>Bevochtigen en reinigen van de glasoppervlakken</li><li>Voorbereiden en positioneren van GlassShield</li><li>Verwijderen van vocht en luchtinsluitingen</li><li>Schoonsnijden en afwerken van de folie</li><li>Reinigen van glas, kozijnen en vensterbanken</li></ul>`}
     ${p.projectNotes?`<h3>Bijzonderheden</h3><p>${esc(p.projectNotes)}</p>`:""}
     ${roiOfferHTML()}
     <p class="note">Deze offerte is gebaseerd op de ingevoerde ruitmaten en het berekende snijplan. Definitieve maatvoering en geschiktheid van de beglazing worden vóór uitvoering gecontroleerd.</p>`;
@@ -384,7 +427,7 @@ function renderWorkorder(){
     <h1>Werkbon – ${esc(p.customerName)}</h1>
     <table><tr><td><b>Klant</b></td><td>${esc(p.customerName)}</td><td><b>Contactpersoon</b></td><td>${esc(p.contactName)}</td></tr>
     <tr><td><b>Adres</b></td><td>${esc([p.address,p.city].filter(Boolean).join(", "))}</td><td><b>Telefoon</b></td><td>${esc(p.phone)}</td></tr>
-    <tr><td><b>Offertenummer</b></td><td>${esc(p.offerNumber)}</td><td><b>Montageklasse</b></td><td>${mountClassText()}</td></tr></table>
+    <tr><td><b>Offertenummer</b></td><td>${esc(p.offerNumber)}</td><td><b>Montage</b></td><td>${lastCalc?.selfInstall?"Zelf aanbrengen":mountClassText()}</td></tr></table>
     <h3>Productie- en montagegegevens</h3>
     <div class="metrics"><div class="metric">Aantal ruiten<strong>${lastPlan.placed.length}</strong></div><div class="metric">Netto glas<strong>${fmtN(s.netArea)} m²</strong></div><div class="metric">Rolverbruik<strong>${fmtN(s.rollArea)} m²</strong></div><div class="metric">Rollengte<strong>${fmtN(lastPlan.totalLen/1000)} m</strong></div></div>
     <h3>Verdeling per ruimte</h3><table><thead><tr><th>Ruimte / verdieping</th><th>Aantal</th><th>Kenmerken</th></tr></thead><tbody>${roomRows}</tbody></table>
@@ -409,13 +452,23 @@ function downloadCSV(){
 }
 function downloadBlob(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 function requirePDF(){if(!window.jspdf?.jsPDF){alert("PDF-module kon niet worden geladen.");return false}return true}
-function planPDF(){
-  if(!lastPlan)return alert("Maak eerst een snijplan.");if(!requirePDF())return;
-  const {jsPDF}=window.jspdf,doc=new jsPDF({unit:"mm",format:"a4"}),r=lastPlan,pageW=210,left=15,top=28,drawW=180,drawH=245,scale=drawW/r.rollW,seg=drawH/scale,pages=Math.max(1,Math.ceil(r.totalLen/seg));
+function buildPlanPDF(){
+  if(!lastPlan||!requirePDF())return null;
+  const {jsPDF}=window.jspdf,doc=new jsPDF({unit:"mm",format:"a4"}),r=lastPlan,left=15,top=28,drawW=180,drawH=245,scale=drawW/r.rollW,seg=drawH/scale,pages=Math.max(1,Math.ceil(r.totalLen/seg));
   for(let page=0;page<pages;page++){if(page)doc.addPage();const y0=page*seg,y1=Math.min(r.totalLen,(page+1)*seg);doc.setFontSize(14);doc.text(`GlassNext snijplan – ${r.project}`,left,12);doc.setFontSize(9);doc.text(`Pagina ${page+1}/${pages} | segment ${fmtN(y0/1000)}–${fmtN(y1/1000)} m | rolbreedte ${r.rollW} mm`,left,19);doc.rect(left,top,drawW,(y1-y0)*scale);
     r.placed.forEach(p=>{const py0=Math.max(p.y,y0),py1=Math.min(p.y+p.h,y1);if(py1<=py0)return;const x=left+p.x*scale,y=top+(py0-y0)*scale,w=p.w*scale,h=(py1-py0)*scale;doc.setFillColor(225,235,245);doc.rect(x,y,w,h,"FD");if(p.y>=y0&&p.y<y1&&w>12&&h>5){doc.setFontSize(6.5);const netTxt=`Netto ${fmtN(p.item.netW/10,1)} × ${fmtN(p.item.netH/10,1)} cm`;const grossTxt=`Bruto ${fmtN(p.item.w/10,1)} × ${fmtN(p.item.h/10,1)} cm`;doc.text([`${p.item.label}${p.rotated?" R":""}`,netTxt,grossTxt],x+1.2,y+3.2,{maxWidth:Math.max(1,w-2.4),lineHeightFactor:1.05})}});
     doc.setFontSize(8);doc.text(`Rollengte ${fmtN(r.totalLen/1000)} m | roloppervlak ${fmtN(r.stats.rollArea)} m² | snijverlies ${fmtN(r.stats.wasteArea)} m² (${fmtN(r.stats.loss,1)}%)`,left,285)}
-  doc.save(`${safe(r.project)}_snijplan.pdf`);
+  return doc;
+}
+function planPDF(){
+  if(!lastPlan)return alert("Maak eerst een snijplan.");
+  const doc=buildPlanPDF();if(!doc)return;
+  doc.save(`${safe(lastPlan.project)}_snijplan.pdf`);
+}
+function generatePlanPDFBase64(){
+  const doc=buildPlanPDF();
+  if(!doc)return null;
+  return doc.output('datauristring');
 }
 function docToPDF(type){
   if(!requirePDF())return;type==="offer"?renderOffer():renderWorkorder();
@@ -426,7 +479,13 @@ function docToPDF(type){
     doc.setFontSize(16);doc.text(`Offerte ${p.offerNumber||""}`,15,37);doc.setFontSize(10);
     const lines=[`Klant: ${p.customerName}`,`Contact: ${p.contactName}`,`Adres: ${[p.address,p.city].filter(Boolean).join(", ")}`,`Aantal ruiten: ${c.pieces}`,`Netto glasoppervlak: ${fmtN(s.netArea)} m²`,`Benodigd roloppervlak: ${fmtN(s.rollArea)} m²`,`Benodigde rollengte: ${fmtN(lastPlan.totalLen/1000)} m`,`Snijverlies: ${fmtN(s.wasteArea)} m² (${fmtN(s.loss,1)}%)`];let y=47;lines.forEach(t=>{doc.text(t,15,y);y+=6});
     y+=5;doc.setFont("helvetica","bold");doc.text("Investering",15,y);doc.setFont("helvetica","normal");y+=8;
-    const offerCostRows=[[`GlassShield materiaal`,c.matGross],[`Materiaalkorting`,-c.matDisc],[`Voorsnijden (${c.pieces} stuks)`,c.cut],[`Montage – ${mountClassText()}`,c.mountGross],[`Montagekorting`,-c.mountDisc],...(c.otherCosts||[]).map(x=>[x.description||"Overige kosten",x.amount])];
+    const offerCostRows=[
+      [`GlassShield materiaal`,c.matGross],
+      [`Materiaalkorting`,-c.matDisc],
+      [`Voorsnijden (${c.pieces} stuks)`,c.cut],
+      ...(c.selfInstall?[]:[[`Montage – ${mountClassText()}`,c.mountGross],[`Montagekorting`,-c.mountDisc]]),
+      ...(c.otherCosts||[]).map(x=>[x.description||"Overige kosten",x.amount])
+    ];
     offerCostRows.filter(x=>Math.abs(x[1])>.001).forEach(([t,v])=>{doc.text(String(t),15,y,{maxWidth:145});doc.text(fmtMoney(v),195,y,{align:"right"});y+=7});
     doc.line(15,y,195,y);y+=7;doc.setFont("helvetica","bold");doc.text("Totaal excl. btw",15,y);doc.text(fmtMoney(c.subtotal),195,y,{align:"right"});y+=7;doc.setFont("helvetica","normal");doc.text(`${fmtN(c.vatRate,1)}% btw`,15,y);doc.text(fmtMoney(c.vat),195,y,{align:"right"});y+=8;doc.setFont("helvetica","bold");doc.text("Totaal incl. btw",15,y);doc.text(fmtMoney(c.total),195,y,{align:"right"});
     doc.save(`${safe(p.customerName)}_offerte.pdf`);
@@ -437,10 +496,21 @@ $("#exportCSVTop").onclick=downloadCSV;$("#planPDF").onclick=planPDF;$("#offerPD
 function collectProject(){
   const inputIds=["offerNumber","customerName","contactName","email","phone","address","city","projectDescription","projectNotes","rollW","rollL","marginSide","kerf","quality","rotateDefault","materialPrice","cutPrice","materialDiscount","mountDiscount","vatRate","mountClass","mountAreaBasis","mountSelectedPrice","roiGlassType","roiAreaSource","roiArea","roiGasMethod","roiUBefore","roiUAfter","roiHDD","roiBoilerEff","roiGasKwh","roiGasSaveM2","roiCoolSaveM2","roiBuildingFactor","roiInvestmentSource","roiInvestment","roiEiaNet","roiGasPrice","roiElecPrice","roiCO2Price","roiCO2Gas","roiCO2Elec","roiYears","includeROIInOffer"];
   const values=Object.fromEntries(inputIds.map(id=>[id,$("#"+id).type==="checkbox"?$("#"+id).checked:$("#"+id).value]));
+  values.installMode=installMode();
   const panes=$$("#paneTable tbody tr").map(tr=>({id:tr.querySelector(".pid").value,w:tr.querySelector(".pw").value,h:tr.querySelector(".ph").value,n:tr.querySelector(".pn").value,rot:tr.querySelector(".prot").value,room:tr.querySelector(".proom").value}));
   const workorderData=lastPlan?renderWorkorderHTML():null;
   const exportData=lastPlan?{project:$("#customerName").value,pieces:lastPlan.placed.length,rollLength:lastPlan.totalLen/1000,rollArea:lastPlan.stats.rollArea,roiStatus:lastROI?"Berekend":"Nog niet berekend"}:null;
-  return{version:"GlassNext Suite v4.4-WP",savedAt:new Date().toISOString(),values,panes,otherCosts:readOtherCosts(),workorderData,exportData};
+  const planData=lastPlan?{
+    rollW:lastPlan.rollW,
+    totalLen:lastPlan.totalLen,
+    stats:lastPlan.stats,
+    placed:lastPlan.placed.map(p=>({
+      label:p.item.label,baseId:p.item.baseId,copy:p.item.copy,room:p.item.room,
+      x:p.x,y:p.y,w:p.w,h:p.h,
+      netW:p.item.netW,netH:p.item.netH,rotated:p.rotated,margin:p.item.margin
+    }))
+  }:null;
+  return{version:"GlassNext Suite v4.5-WP",savedAt:new Date().toISOString(),values,panes,otherCosts:readOtherCosts(),workorderData,exportData,planData};
 }
 function renderWorkorderHTML(){
   if(!lastPlan)return"";
@@ -454,6 +524,8 @@ function renderExportSummary(){
 }
 
 function submitOffer(){
+  const cb=$("#offerConsent");
+  if(cb&&!cb.checked)return alert("U moet akkoord gaan met de voorwaarden voordat u een offerte kunt aanvragen.");
   const p=projectData();
   if(!p.customerName||!p.customerName.trim())return alert("Vul uw klant / organisatie naam in.");
   if(!p.email||!p.email.trim())return alert("Vul uw e-mailadres in.");
@@ -471,6 +543,14 @@ function submitOffer(){
   formData.append("phone",p.phone);
   formData.append("address",p.address);
   formData.append("city",p.city);
+  // Genereer Snijplan PDF als base64 en stuur mee voor admin/Odoo
+  try{
+    const pdfDataUri=generatePlanPDFBase64();
+    if(pdfDataUri){
+      formData.append("plan_pdf",pdfDataUri);
+      formData.append("plan_pdf_filename",`${safe(p.customerName)}_snijplan.pdf`);
+    }
+  }catch(e){console.warn("PDF generatie mislukt:",e)}
   fetch(ajaxUrl,{method:"POST",body:formData})
     .then(r=>r.json())
     .then(resp=>{

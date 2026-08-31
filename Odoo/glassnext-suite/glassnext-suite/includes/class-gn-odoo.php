@@ -339,7 +339,7 @@ class GN_Odoo {
      *
      * @return array{success:bool, order_id:?int, partner_id:?int, error:?string}
      */
-    public function sync_order($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city) {
+    public function sync_order($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city, $attachments = []) {
         if (!$this->is_enabled()) {
             return ['success' => false, 'order_id' => null, 'partner_id' => null, 'error' => 'Odoo-integratie niet geconfigureerd of uitgeschakeld.'];
         }
@@ -365,10 +365,12 @@ class GN_Odoo {
             $product_mount    = (int) get_option('gn_odoo_product_mount', 5);
             $product_cut      = (int) get_option('gn_odoo_product_cut', 85);
 
+            $install_mode = $decoded['values']['installMode'] ?? 'professional';
+
             if ($roll_area > 0) {
                 $this->add_fixed_line($order_id, $product_material, $roll_area);
             }
-            if ($roll_length > 0) {
+            if ($roll_length > 0 && $install_mode !== 'self') {
                 $this->add_fixed_line($order_id, $product_mount, $roll_length);
             }
             if ($pieces > 0) {
@@ -383,6 +385,14 @@ class GN_Odoo {
                 }
             }
 
+            // Upload bijlagen (Snijplan PDF + CSV) naar Odoo sale.order
+            if (!empty($attachments)) {
+                foreach ($attachments as $att) {
+                    $this->upload_attachment($order_id, $att['name'], $att['datas'], $att['mimetype']);
+                }
+                $this->debug_log('uploaded ' . count($attachments) . ' attachment(s) to sale.order ' . $order_id);
+            }
+
             $this->debug_log('sync_order complete: order_id=' . $order_id . ' partner_id=' . $partner_id);
             return ['success' => true, 'order_id' => $order_id, 'partner_id' => $partner_id, 'error' => null];
 
@@ -390,6 +400,21 @@ class GN_Odoo {
             $this->debug_log('sync_order error: ' . $e->getMessage());
             return ['success' => false, 'order_id' => null, 'partner_id' => null, 'error' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Upload een bijlage naar Odoo via ir.attachment, gekoppeld aan een sale.order.
+     * $datas moet base64-geëncodeerd zijn.
+     */
+    private function upload_attachment($order_id, $name, $datas, $mimetype) {
+        $this->debug_log('upload_attachment: order_id=' . $order_id . ' name=' . $name . ' mimetype=' . $mimetype . ' size=' . strlen($datas));
+        $this->call('ir.attachment', 'create', [[
+            'name'      => $name,
+            'datas'     => $datas,
+            'res_model' => 'sale.order',
+            'res_id'    => $order_id,
+            'mimetype'  => $mimetype,
+        ]]);
     }
 
     private function authenticate() {

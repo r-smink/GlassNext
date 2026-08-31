@@ -73,6 +73,9 @@ class GN_Options {
             'gn_admin_email'        => get_option('admin_email'),
             'gn_from_email'         => get_option('admin_email'),
             'gn_from_name'          => 'GlassNext Suite',
+            'gn_email_subject'      => 'Uw offerte aanvraag is ontvangen – {{offertenummer}}',
+            'gn_email_body_template'=> "Beste {{naam}},\n\nWij hebben uw offerte aanvraag in goede orde ontvangen.\nUw referentienummer is: {{offertenummer}}\n\nWij nemen spoedig contact met u op om de offerte definitief te maken.\n\nMet vriendelijke groet,\n{{afzender_naam}}",
+            'gn_email_logo_id'      => '',
 
             // Odoo / Make.com integratie
             'gn_makecom_webhook_url' => '',
@@ -126,6 +129,7 @@ class GN_Options {
         if (strpos($hook, 'glassnext-suite') === false) return;
         wp_enqueue_style('glassnext-admin', GN_PLUGIN_URL . 'assets/glassnext-admin.css', [], GN_VERSION);
         wp_enqueue_script('glassnext-admin', GN_PLUGIN_URL . 'assets/glassnext-admin.js', ['jquery'], GN_VERSION, true);
+        wp_enqueue_media();
     }
 
     public function register_settings() {
@@ -140,6 +144,7 @@ class GN_Options {
             'gn_roi_co2_gas', 'gn_roi_co2_elec', 'gn_roi_years',
             'gn_offer_prefix', 'gn_offer_counter', 'gn_offer_counter_year',
             'gn_admin_email', 'gn_from_email', 'gn_from_name',
+            'gn_email_subject', 'gn_email_body_template', 'gn_email_logo_id',
             'gn_makecom_webhook_url',
             'gn_odoo_enabled', 'gn_odoo_url', 'gn_odoo_db', 'gn_odoo_login', 'gn_odoo_api_key', 'gn_odoo_uid',
             'gn_odoo_product_material', 'gn_odoo_product_mount', 'gn_odoo_product_cut',
@@ -289,6 +294,41 @@ class GN_Options {
                     <tr><th><label for="gn_admin_email">Admin e-mailadres (ontvangt notificaties)</label></th><td><input type="email" id="gn_admin_email" name="gn_admin_email" value="<?php echo esc_attr(get_option('gn_admin_email', get_option('admin_email'))); ?>" class="regular-text"></td></tr>
                     <tr><th><label for="gn_from_email">Afzender e-mailadres</label></th><td><input type="email" id="gn_from_email" name="gn_from_email" value="<?php echo esc_attr(get_option('gn_from_email', get_option('admin_email'))); ?>" class="regular-text"></td></tr>
                     <tr><th><label for="gn_from_name">Afzender naam</label></th><td><input type="text" id="gn_from_name" name="gn_from_name" value="<?php echo esc_attr(get_option('gn_from_name', 'GlassNext Suite')); ?>" class="regular-text"></td></tr>
+                    <tr><th><label for="gn_email_subject">Onderwerp bevestigingsmail</label></th><td><input type="text" id="gn_email_subject" name="gn_email_subject" value="<?php echo esc_attr(get_option('gn_email_subject', 'Uw offerte aanvraag is ontvangen – {{offertenummer}}')); ?>" class="regular-text"><p class="description">Beschikbare placeholders: <code>{{offertenummer}}</code>, <code>{{naam}}</code>, <code>{{afzender_naam}}</code>, <code>{{datum}}</code></p></td></tr>
+                </table>
+
+                <h2 class="title">Bevestigingsmail tekst</h2>
+                <p class="description" style="margin-bottom:10px;">Beschikbare placeholders: <code>{{naam}}</code> (klantnaam), <code>{{offertenummer}}</code>, <code>{{afzender_naam}}</code>, <code>{{datum}}</code>. Het logo (hieronder gekozen) wordt onderaan de e-mail toegevoegd.</p>
+                <?php
+                $email_body = get_option('gn_email_body_template', '');
+                wp_editor($email_body, 'gn_email_body_template', [
+                    'textarea_name' => 'gn_email_body_template',
+                    'textarea_rows' => 12,
+                    'media_buttons' => false,
+                    'teeny'         => true,
+                    'quicktags'     => true,
+                ]);
+                ?>
+
+                <h2 class="title" style="margin-top:24px;">Logo in bevestigingsmail</h2>
+                <table class="form-table">
+                    <tr><th><label>Logo afbeelding</label></th><td>
+                        <div id="gn-email-logo-preview" style="margin-bottom:10px;">
+                            <?php
+                            $logo_id = get_option('gn_email_logo_id', '');
+                            if ($logo_id) {
+                                $logo_url = wp_get_attachment_url($logo_id);
+                                if ($logo_url) {
+                                    echo '<img src="' . esc_url($logo_url) . '" style="max-height:80px;max-width:300px;border:1px solid #ddd;padding:4px;background:#fff;" />';
+                                }
+                            }
+                            ?>
+                        </div>
+                        <input type="hidden" id="gn_email_logo_id" name="gn_email_logo_id" value="<?php echo esc_attr($logo_id); ?>">
+                        <button type="button" class="button" id="gn-choose-logo">Logo kiezen</button>
+                        <button type="button" class="button" id="gn-remove-logo" <?php echo $logo_id ? '' : 'style="display:none;"'; ?>>Logo verwijderen</button>
+                        <p class="description">Het logo wordt onderaan de bevestigingsmail toegevoegd. Laat leeg voor geen logo.</p>
+                    </td></tr>
                 </table>
 
                 </div>

@@ -68,6 +68,18 @@ class GN_Submissions {
         check_ajax_referer('gn_submit_offer', 'nonce');
 
         $project_json = isset($_POST['project_json']) ? wp_unslash($_POST['project_json']) : '';
+        // wp_unslash can corrupt JSON strings that contain escaped quotes.
+        // Re-encode properly: decode, then encode again.
+        $decoded = json_decode($project_json, true);
+        if ($decoded === null && isset($_POST['project_json'])) {
+            // wp_unslash broke the JSON escaping — try with raw POST data
+            $raw_json = $_POST['project_json'];
+            // WordPress magic quotes added slashes; use stripslashes to get original
+            $decoded = json_decode(stripslashes($raw_json), true);
+            if ($decoded !== null) {
+                $project_json = wp_json_encode($decoded);
+            }
+        }
         $customer_name = isset($_POST['customer_name']) ? sanitize_text_field($_POST['customer_name']) : '';
         $contact_name = isset($_POST['contact_name']) ? sanitize_text_field($_POST['contact_name']) : '';
         $email = isset($_POST['email']) ? sanitize_email($_POST['email']) : '';
@@ -84,6 +96,9 @@ class GN_Submissions {
         $decoded = json_decode($project_json, true);
         if ($decoded) {
             $decoded['offerNumber'] = $offer_number;
+            if (isset($decoded['values']) && is_array($decoded['values'])) {
+                $decoded['values']['offerNumber'] = $offer_number;
+            }
             $decoded['submittedAt'] = current_time('mysql');
             $project_json = wp_json_encode($decoded);
         }
@@ -114,12 +129,27 @@ class GN_Submissions {
         update_post_meta($post_id, '_gn_city', $city);
         update_post_meta($post_id, '_gn_status', 'nieuw');
 
+        // Sla Snijplan PDF op (vanuit browser als base64 meegestuurd)
+        $pdf_attachment_id = $this->save_plan_pdf_attachment($post_id, $offer_number, $decoded);
+        if ($pdf_attachment_id) {
+            update_post_meta($post_id, '_gn_plan_pdf_attachment_id', $pdf_attachment_id);
+        }
+
+        // Genereer en sla Snijplan CSV op (server-side uit planData)
+        $csv_attachment_id = $this->save_plan_csv_attachment($post_id, $offer_number, $decoded);
+        if ($csv_attachment_id) {
+            update_post_meta($post_id, '_gn_plan_csv_attachment_id', $csv_attachment_id);
+        }
+
         GN_Email::send_customer_confirmation($email, $offer_number, $customer_name);
         GN_Email::send_admin_notification($post_id, $offer_number, $customer_name, $email);
 
         $this->dispatch_makecom_webhook($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city);
 
-        $odoo_result = GN_Odoo::instance()->sync_order($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city);
+        // Verzamel bijlagen voor Odoo (PDF + CSV als base64)
+        $odoo_attachments = $this->build_odoo_attachments($pdf_attachment_id, $csv_attachment_id, $offer_number);
+
+        $odoo_result = GN_Odoo::instance()->sync_order($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city, $odoo_attachments);
         update_post_meta($post_id, '_gn_odoo_order_id', $odoo_result['order_id'] ?? '');
         update_post_meta($post_id, '_gn_odoo_error', $odoo_result['error'] ?? '');
 
@@ -159,6 +189,7 @@ class GN_Submissions {
                 'rollArea'   => $export['rollArea'] ?? 0,
                 'rollLength' => $export['rollLength'] ?? 0,
                 'mountClass' => $values['mountClass'] ?? 'average',
+                'installMode' => $values['installMode'] ?? 'professional',
             ],
             'lineItems' => $this->extract_line_items($decoded),
             'totals' => $this->extract_totals($decoded),
@@ -206,12 +237,15 @@ class GN_Submissions {
             : floatval($values['roiArea'] ?? 0);
         $mountDisc = floatval($values['mountDiscount'] ?? 0);
         $mountGross = $mountArea * $mountRate;
-        $items[] = [
-            'name'        => 'Montage – ' . $mountClass,
-            'description' => sprintf('%.2f m² à €%.2f/m²', $mountArea, $mountRate),
-            'quantity'    => 1,
-            'unitPrice'   => round($mountGross * (1 - $mountDisc / 100), 2),
-        ];
+
+        if (($values['installMode'] ?? 'professional') !== 'self') {
+            $items[] = [
+                'name'        => 'Montage – ' . $mountClass,
+                'description' => sprintf('%.2f m² à €%.2f/m²', $mountArea, $mountRate),
+                'quantity'    => 1,
+                'unitPrice'   => round($mountGross * (1 - $mountDisc / 100), 2),
+            ];
+        }
 
         foreach (($decoded['otherCosts'] ?? []) as $cost) {
             if (!empty($cost['description']) && floatval($cost['amount']) > 0) {
@@ -254,5 +288,167 @@ class GN_Submissions {
         header('Content-Length: ' . strlen($json));
         echo $json;
         exit;
+    }
+
+    /**
+     * Slaat de Snijplan PDF (als base64 data URI meegestuurd door de browser) op
+     * als WordPress attachment op de gn_submission post.
+     */
+    private function save_plan_pdf_attachment($post_id, $offer_number, $decoded) {
+        if (empty($_POST['plan_pdf'])) return 0;
+
+        $data_uri = wp_unslash($_POST['plan_pdf']);
+        // Verwacht formaat: data:application/pdf;base64,XXXX
+        if (strpos($data_uri, 'base64,') === false) return 0;
+
+        $parts = explode('base64,', $data_uri, 2);
+        $base64 = $parts[1] ?? '';
+        if (empty($base64)) return 0;
+
+        $binary = base64_decode($base64);
+        if ($binary === false || strlen($binary) < 100) return 0;
+
+        $filename = !empty($_POST['plan_pdf_filename']) ? sanitize_file_name($_POST['plan_pdf_filename']) : sanitize_file_name($offer_number . '_snijplan.pdf');
+        // Zorg dat de bestandsnaam het offertenummer bevat
+        if (strpos($filename, $offer_number) === false) {
+            $filename = sanitize_file_name($offer_number . '_snijplan.pdf');
+        }
+
+        return $this->save_binary_attachment($post_id, $filename, $binary, 'application/pdf');
+    }
+
+    /**
+     * Genereert de Snijplan CSV server-side uit de planData in de project-JSON
+     * en slaat deze op als WordPress attachment.
+     */
+    private function save_plan_csv_attachment($post_id, $offer_number, $decoded) {
+        $plan_data = $decoded['planData'] ?? null;
+        if (!$plan_data || empty($plan_data['placed'])) return 0;
+
+        $csv = $this->generate_csv_from_plan($plan_data);
+        if (empty($csv)) return 0;
+
+        $filename = sanitize_file_name($offer_number . '_snijplan.csv');
+        return $this->save_binary_attachment($post_id, $filename, $csv, 'text/csv');
+    }
+
+    /**
+     * Genereert CSV string uit planData (zelfde formaat als JS downloadCSV).
+     */
+    private function generate_csv_from_plan($plan_data) {
+        $placed = $plan_data['placed'] ?? [];
+        if (empty($placed)) return '';
+
+        // Sorteer op Y, dan X (zelfde als JS)
+        usort($placed, function($a, $b) {
+            return $a['y'] <=> $b['y'] ?: $a['x'] <=> $b['x'];
+        });
+
+        $rows = [['Piece_ID', 'Pane_ID', 'Copy', 'Room', 'X_mm', 'Y_mm', 'Gross_Width_mm', 'Gross_Height_mm', 'Net_Width_mm', 'Net_Height_mm', 'Rotated', 'Margin_per_side_mm']];
+        foreach ($placed as $p) {
+            $rows[] = [
+                $p['label'] ?? '',
+                $p['baseId'] ?? '',
+                $p['copy'] ?? '',
+                $p['room'] ?? '',
+                round($p['x'] ?? 0),
+                round($p['y'] ?? 0),
+                round($p['w'] ?? 0),
+                round($p['h'] ?? 0),
+                round($p['netW'] ?? 0),
+                round($p['netH'] ?? 0),
+                !empty($p['rotated']) ? 1 : 0,
+                round($p['margin'] ?? 0),
+            ];
+        }
+
+        // BOM + CSV met ; separator en " quoting (zelfde als JS)
+        $csv = "\u{FEFF}";
+        foreach ($rows as $row) {
+            $csv .= implode(';', array_map(function($v) {
+                return '"' . str_replace('"', '""', (string) $v) . '"';
+            }, $row)) . "\r\n";
+        }
+        return $csv;
+    }
+
+    /**
+     * Slaat binaire data op als WordPress attachment op de gn_submission post.
+     */
+    private function save_binary_attachment($post_id, $filename, $data, $mime_type) {
+        $upload_dir = wp_upload_dir();
+        if (!empty($upload_dir['error'])) return 0;
+
+        // Plaats bestanden in een glassnext submap
+        $gn_dir = $upload_dir['path'] . '/glassnext';
+        if (!file_exists($gn_dir)) {
+            wp_mkdir_p($gn_dir);
+        }
+
+        // Unieke bestandsnaam
+        $unique_filename = wp_unique_filename($gn_dir, $filename);
+        $filepath = $gn_dir . '/' . $unique_filename;
+
+        file_put_contents($filepath, $data);
+        if (!file_exists($filepath)) return 0;
+
+        $attachment = [
+            'post_mime_type' => $mime_type,
+            'post_title'     => preg_replace('/\.[^.]+$/', '', $unique_filename),
+            'post_content'   => '',
+            'post_status'    => 'inherit',
+            'post_parent'    => $post_id,
+        ];
+
+        $attach_id = wp_insert_attachment($attachment, $filepath, $post_id);
+        if (is_wp_error($attach_id) || !$attach_id) return 0;
+
+        // Genereer metadata (alleen relevant voor afbeeldingen, maar niet schadelijk voor andere types)
+        if (!function_exists('wp_generate_attachment_metadata')) {
+            require_once ABSPATH . 'wp-admin/includes/image.php';
+        }
+        $metadata = wp_generate_attachment_metadata($attach_id, $filepath);
+        if ($metadata) {
+            wp_update_attachment_metadata($attach_id, $metadata);
+        }
+
+        return (int) $attach_id;
+    }
+
+    /**
+     * Bouwt een array met base64-encoded bijlagen voor Odoo (PDF + CSV).
+     */
+    private function build_odoo_attachments($pdf_attachment_id, $csv_attachment_id, $offer_number) {
+        $attachments = [];
+
+        if ($pdf_attachment_id) {
+            $path = get_attached_file($pdf_attachment_id);
+            if ($path && file_exists($path)) {
+                $contents = file_get_contents($path);
+                if ($contents !== false) {
+                    $attachments[] = [
+                        'name'       => $offer_number . '_snijplan.pdf',
+                        'datas'      => base64_encode($contents),
+                        'mimetype'   => 'application/pdf',
+                    ];
+                }
+            }
+        }
+
+        if ($csv_attachment_id) {
+            $path = get_attached_file($csv_attachment_id);
+            if ($path && file_exists($path)) {
+                $contents = file_get_contents($path);
+                if ($contents !== false) {
+                    $attachments[] = [
+                        'name'       => $offer_number . '_snijplan.csv',
+                        'datas'      => base64_encode($contents),
+                        'mimetype'   => 'text/csv',
+                    ];
+                }
+            }
+        }
+
+        return $attachments;
     }
 }

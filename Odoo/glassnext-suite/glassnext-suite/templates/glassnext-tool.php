@@ -49,10 +49,31 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
     </div>
   </article>
 </div>
+<div class="page-nav no-print">
+  <button class="btn secondary nav-prev" type="button" disabled>Vorige</button>
+  <button class="btn nav-next" type="button" data-target="planner">Volgende</button>
+</div>
 </section>
 
 <section class="page" id="page-planner">
 <div class="grid">
+  <article class="card span-12">
+    <div class="card-head"><h2>Aanbrengen folie</h2></div>
+    <div class="card-body">
+      <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:650">
+          <input type="radio" name="installMode" value="professional" checked style="width:auto">
+          Folie laten aanbrengen door GlassNext
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:650">
+          <input type="radio" name="installMode" value="self" style="width:auto">
+          Folie zelf aanbrengen
+        </label>
+      </div>
+      <p class="note" style="margin-top:10px" id="installModeNote">Bij zelf aanbrengen vervalt het product "Aanbrengen GlassShield per m²" uit de calculatie en offerte.</p>
+    </div>
+  </article>
+
   <article class="card span-12">
     <div class="card-head">
       <h2>Ramen invoeren</h2>
@@ -81,6 +102,10 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
     <div class="card-head"><h2>Stukkenlijst</h2></div>
     <div class="card-body table-wrap" id="pieceReport">Nog geen snijplan berekend.</div>
   </article>
+</div>
+<div class="page-nav no-print">
+  <button class="btn secondary nav-prev" type="button" data-target="project">Vorige</button>
+  <button class="btn nav-next" type="button" data-target="calc">Volgende</button>
 </div>
 </section>
 
@@ -123,6 +148,10 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
       </div>
     </div>
   </article>
+</div>
+<div class="page-nav no-print">
+  <button class="btn secondary nav-prev" type="button" data-target="planner">Vorige</button>
+  <button class="btn nav-next" type="button" data-target="roi">Volgende</button>
 </div>
 </section>
 
@@ -206,6 +235,10 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
     </div>
   </article>
 </div>
+<div class="page-nav no-print">
+  <button class="btn secondary nav-prev" type="button" data-target="calc">Vorige</button>
+  <button class="btn nav-next" type="button" data-target="offer">Volgende</button>
+</div>
 </section>
 
 <section class="page" id="page-offer">
@@ -221,10 +254,17 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
         <p>Deze scenarioanalyse is afhankelijk van de werkelijke glasopbouw, gebouwcondities, installaties, energieprijzen en het gebruik. Aan de uitkomst kunnen geen gegarandeerde besparingen worden ontleend.</p>
         <p>Deze offerte is gebaseerd op de ingevoerde ruitmaten en het berekende snijplan. Definitieve maatvoering en geschiktheid van de beglazing worden vóór uitvoering gecontroleerd.</p>
       </div>
-      <button class="btn" id="submitOffer" style="font-size:16px;padding:14px 24px;">Offerte aanvragen</button>
+      <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;cursor:pointer;font-size:13px;line-height:1.5">
+        <input type="checkbox" id="offerConsent" style="width:auto;margin-top:3px">
+        <span>Ik begrijp dat deze offerte een scenarioanalyse is afhankelijk van de werkelijke glasopbouw, gebouwcondities, installaties, energieprijzen en het gebruik. Aan de uitkomst kunnen geen gegarandeerde besparingen worden ontleend. Deze offerte is gebaseerd op de ingevoerde ruitmaten en het berekende snijplan. Definitieve maatvoering en geschiktheid van de beglazing worden vóór uitvoering gecontroleerd.</span>
+      </label>
       <div id="submitStatus" class="status" style="margin-top:12px"></div>
     </div>
   </article>
+</div>
+<div class="page-nav no-print">
+  <button class="btn secondary nav-prev" type="button" data-target="roi">Vorige</button>
+  <button class="btn nav-next" id="submitOffer" type="button" data-target="workorder" disabled>Offerte aanvragen</button>
 </div>
 </section>
 
@@ -235,11 +275,19 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
     <div class="card-body"><div id="workDoc" class="doc"></div></div>
   </article>
 </div>
+<div class="page-nav no-print">
+  <button class="btn secondary nav-prev" type="button" data-target="offer">Vorige</button>
+  <button class="btn nav-next" type="button" data-target="exports">Volgende</button>
+</div>
 </section>
 
 <section class="page hidden" id="page-exports">
 <div class="grid">
   <article class="card span-12"><div class="card-head"><h2>Controleoverzicht</h2></div><div class="card-body" id="exportSummary"></div></article>
+</div>
+<div class="page-nav no-print">
+  <button class="btn secondary nav-prev" type="button" data-target="workorder">Vorige</button>
+  <button class="btn nav-next" type="button" disabled>Volgende</button>
 </div>
 </section>
 </main>

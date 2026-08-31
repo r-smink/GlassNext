@@ -26,5 +26,44 @@ jQuery(function($){
     $('.gn-tabs-nav .gn-tab-link, .gn-tab-panel').removeClass('active');
     $(this).addClass('active');
     $('.gn-tab-panel[data-tab="' + tab + '"]').addClass('active');
+
+    // Re-init TinyMCE when switching to the email tab (editor was in a hidden container)
+    if (tab === 'email' && typeof tinymce !== 'undefined') {
+      setTimeout(function(){
+        var editor = tinymce.get('gn_email_body_template');
+        if (!editor) {
+          tinymce.execCommand('mceAddEditor', true, 'gn_email_body_template');
+        } else {
+          editor.show();
+        }
+      }, 50);
+    }
+  });
+
+  // Logo media uploader
+  var logoFrame;
+  $('#gn-choose-logo').on('click', function(e){
+    e.preventDefault();
+    if (logoFrame) { logoFrame.open(); return; }
+    logoFrame = wp.media({
+      title: 'Kies een logo voor de bevestigingsmail',
+      button: { text: 'Logo gebruiken' },
+      library: { type: 'image' },
+      multiple: false
+    });
+    logoFrame.on('select', function(){
+      var att = logoFrame.state().get('selection').first().toJSON();
+      $('#gn_email_logo_id').val(att.id);
+      $('#gn-email-logo-preview').html('<img src="' + att.url + '" style="max-height:80px;max-width:300px;border:1px solid #ddd;padding:4px;background:#fff;" />');
+      $('#gn-remove-logo').show();
+    });
+    logoFrame.open();
+  });
+
+  $('#gn-remove-logo').on('click', function(e){
+    e.preventDefault();
+    $('#gn_email_logo_id').val('');
+    $('#gn-email-logo-preview').html('');
+    $('#gn-remove-logo').hide();
   });
 });

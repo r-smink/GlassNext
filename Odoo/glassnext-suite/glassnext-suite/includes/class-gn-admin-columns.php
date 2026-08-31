@@ -96,6 +96,32 @@ add_action('add_meta_boxes', function() {
         echo 'JSON bestand downloaden (' . esc_html($filename) . ')';
         echo '</a>';
         echo '</p>';
+
+        // Snijplan PDF en CSV download knoppen
+        $pdf_attachment_id = get_post_meta($post->ID, '_gn_plan_pdf_attachment_id', true);
+        $csv_attachment_id = get_post_meta($post->ID, '_gn_plan_csv_attachment_id', true);
+
+        if ($pdf_attachment_id || $csv_attachment_id) {
+            echo '<h3 style="margin-top:20px;">Snijplan bestanden</h3>';
+            echo '<p style="margin-top:10px;">';
+            if ($pdf_attachment_id) {
+                $pdf_url = wp_get_attachment_url($pdf_attachment_id);
+                if ($pdf_url) {
+                    echo '<a href="' . esc_url($pdf_url) . '" class="button button-secondary" target="_blank" style="margin-right:8px;">';
+                    echo 'Snijplan PDF downloaden';
+                    echo '</a>';
+                }
+            }
+            if ($csv_attachment_id) {
+                $csv_url = wp_get_attachment_url($csv_attachment_id);
+                if ($csv_url) {
+                    echo '<a href="' . esc_url($csv_url) . '" class="button button-secondary" target="_blank" style="margin-right:8px;">';
+                    echo 'CSV Plotter downloaden';
+                    echo '</a>';
+                }
+            }
+            echo '</p>';
+        }
     }, 'gn_submission', 'normal', 'high');
 });
 
