@@ -771,20 +771,32 @@ function collectProject(){
 }
 function saveProject(){downloadBlob(new Blob([JSON.stringify(collectProject(),null,2)],{type:"application/json"}),`${safe($("#projectName").value)}_GlassNext.json`)}
 function openProjectFile(file){
-  const reader=new FileReader();reader.onload=()=>{try{
-    const d=JSON.parse(reader.result);
-    Object.entries(d.values||{}).forEach(([id,v])=>{if($("#"+id)){if($("#"+id).type==="checkbox")$("#"+id).checked=!!v;else $("#"+id).value=v}});
+  const reader=new FileReader();reader.onload=()=>{let raw="",d=null;try{
+    raw=String(reader.result||"").replace(/^\uFEFF/,"").trim();
+    console.log("openProjectFile:", file.name, raw.substring(0,200));
+    d=JSON.parse(raw);
+    console.log("parsed:", d);
+    const v=d.values||{};
+    const textIds=["projectName","offerNumber","customerName","contactName","email","phone","address","city","projectDescription","projectNotes","rollW","rollL","marginSide","kerf","materialPrice","cutPrice","materialDiscount","mountDiscount","vatRate","mountSelectedPrice","roiArea","roiGasSaveM2","roiCoolSaveM2","roiBuildingFactor","roiInvestment","roiEiaNet","roiGasPrice","roiElecPrice","roiCO2Price","roiCO2Gas","roiCO2Elec","roiYears"];
+    textIds.forEach(id=>{const el=$("#"+id);if(el&&v[id]!=null)el.value=v[id]});
+    const selectIds=["quality","rotateDefault","mountClass","mountAreaBasis","roiGlassType","roiAreaSource","roiGasMethod","roiInvestmentSource"];
+    selectIds.forEach(id=>{const el=$("#"+id);if(el&&v[id]!=null){[...el.options].forEach(o=>o.selected=o.value===String(v[id]))}});
+    const roiTextIds=["roiUBefore","roiUAfter","roiHDD","roiBoilerEff","roiGasKwh"];
+    roiTextIds.forEach(id=>{const el=$("#"+id);if(el&&v[id]!=null)el.value=v[id]});
+    const cb=$("#includeROIInOffer");if(cb&&typeof v.includeROIInOffer==="boolean")cb.checked=v.includeROIInOffer;
     // Compatibiliteit met oudere v4.1-projectbestanden
-    if(!d.values?.mountSelectedPrice){
-      const cls=d.values?.mountClass||"average";
-      const oldMap={easy:d.values?.priceEasy,average:d.values?.priceAverage,complex:d.values?.priceComplex,very:d.values?.priceVery};
+    if(!v.mountSelectedPrice){
+      const cls=v.mountClass||"average";
+      const oldMap={easy:v.priceEasy,average:v.priceAverage,complex:v.priceComplex,very:v.priceVery};
       $("#mountSelectedPrice").value=(num(oldMap[cls])||MOUNT_DEFAULT_RATES[cls]||45).toFixed(2);
+    }else{
+      const msp=num(v.mountSelectedPrice);if(msp>0)$("#mountSelectedPrice").value=msp.toFixed(2);
     }
     if(Array.isArray(d.otherCosts))setOtherCosts(d.otherCosts);
-    else if(d.values && num(d.values.otherCost)>0)setOtherCosts([{description:"Overige projectkosten",amount:num(d.values.otherCost)}]);
+    else if(v && num(v.otherCost)>0)setOtherCosts([{description:"Overige projectkosten",amount:num(v.otherCost)}]);
     else setOtherCosts([]);
     paneBody.innerHTML="";(d.panes||[]).forEach(addPaneRow);lastPlan=null;lastCalc=null;lastROI=null;$("#planMetrics").innerHTML="";$("#pieceReport").textContent="Project geopend. Bereken het snijplan opnieuw.";activatePage("project")
-  }catch(e){console.error(e);alert("Dit projectbestand kon niet worden geopend.")}};reader.readAsText(file);
+  }catch(e){console.error(e,d,raw);alert("Dit projectbestand kon niet worden geopend: "+e.message+"\n\nKijk in de browserconsole (F12 > Console) voor de ruwe data.");}};reader.readAsText(file);
 }
 $("#projectFile").onchange=e=>{if(e.target.files[0])openProjectFile(e.target.files[0]);e.target.value=""};
 $("#saveProject").onclick=saveProject;$("#exportProject").onclick=saveProject;$("#loadProject").onclick=()=>$("#projectFile").click();$("#importProject").onclick=()=>$("#projectFile").click();

@@ -81,6 +81,7 @@ class GN_Options {
             'gn_odoo_db'             => '',
             'gn_odoo_login'          => '',
             'gn_odoo_api_key'        => '',
+            'gn_odoo_uid'              => '2',
             'gn_odoo_product_material' => '3',
             'gn_odoo_product_mount'    => '5',
             'gn_odoo_product_cut'      => '85',
@@ -140,7 +141,7 @@ class GN_Options {
             'gn_offer_prefix', 'gn_offer_counter', 'gn_offer_counter_year',
             'gn_admin_email', 'gn_from_email', 'gn_from_name',
             'gn_makecom_webhook_url',
-            'gn_odoo_enabled', 'gn_odoo_url', 'gn_odoo_db', 'gn_odoo_login', 'gn_odoo_api_key',
+            'gn_odoo_enabled', 'gn_odoo_url', 'gn_odoo_db', 'gn_odoo_login', 'gn_odoo_api_key', 'gn_odoo_uid',
             'gn_odoo_product_material', 'gn_odoo_product_mount', 'gn_odoo_product_cut',
             'gn_thankyou_url',
         ];
@@ -307,6 +308,7 @@ class GN_Options {
                     <tr><th><label for="gn_odoo_db">Database</label></th><td><input type="text" id="gn_odoo_db" name="gn_odoo_db" value="<?php echo esc_attr(get_option('gn_odoo_db', '')); ?>" class="regular-text" placeholder="glassnext"></td></tr>
                     <tr><th><label for="gn_odoo_login">Login (e-mailadres)</label></th><td><input type="email" id="gn_odoo_login" name="gn_odoo_login" value="<?php echo esc_attr(get_option('gn_odoo_login', '')); ?>" class="regular-text"></td></tr>
                     <tr><th><label for="gn_odoo_api_key">API-key</label></th><td><input type="password" id="gn_odoo_api_key" name="gn_odoo_api_key" value="<?php echo esc_attr(get_option('gn_odoo_api_key', '')); ?>" class="regular-text" autocomplete="new-password"><p class="description">Aanmaken via Odoo: Instellingen &gt; Voorkeuren &gt; Accountbeveiliging &gt; Nieuwe API-key.</p></td></tr>
+                    <tr><th><label for="gn_odoo_uid">Gebruikers UID (hardcodeer)</label></th><td><input type="number" id="gn_odoo_uid" name="gn_odoo_uid" value="<?php echo esc_attr(get_option('gn_odoo_uid', '2')); ?>" class="small-text"><p class="description">Zet op 0 om automatisch via <code>common.authenticate</code> te bepalen. Vul een getal in (bijv. 2) om rechtstreeks <code>execute_kw</code> aan te roepen zoals in Make.com.</p></td></tr>
                     <tr><th><label for="gn_odoo_product_material">Product-ID: GlassShield per m²</label></th><td><input type="number" id="gn_odoo_product_material" name="gn_odoo_product_material" value="<?php echo esc_attr(get_option('gn_odoo_product_material', '3')); ?>" class="small-text"><p class="description">Aantal = netto rolverbruik (m²).</p></td></tr>
                     <tr><th><label for="gn_odoo_product_mount">Product-ID: Aanbrengen GlassShield per m²</label></th><td><input type="number" id="gn_odoo_product_mount" name="gn_odoo_product_mount" value="<?php echo esc_attr(get_option('gn_odoo_product_mount', '5')); ?>" class="small-text"><p class="description">Aantal = rollengte (m²).</p></td></tr>
                     <tr><th><label for="gn_odoo_product_cut">Product-ID: Programmeren en voorsnijden</label></th><td><input type="number" id="gn_odoo_product_cut" name="gn_odoo_product_cut" value="<?php echo esc_attr(get_option('gn_odoo_product_cut', '85')); ?>" class="small-text"><p class="description">Aantal = aantal stuks.</p></td></tr>
@@ -334,7 +336,8 @@ class GN_Options {
                             gn_odoo_url: $('#gn_odoo_url').val(),
                             gn_odoo_db: $('#gn_odoo_db').val(),
                             gn_odoo_login: $('#gn_odoo_login').val(),
-                            gn_odoo_api_key: $('#gn_odoo_api_key').val()
+                            gn_odoo_api_key: $('#gn_odoo_api_key').val(),
+                            gn_odoo_uid: $('#gn_odoo_uid').val()
                         }).done(function(res){
                             var color = res.success ? '#087f5b' : '#c0392b';
                             var html = '<p style="color:' + color + ';font-weight:700;">' + (res.message || '') + '</p>';
