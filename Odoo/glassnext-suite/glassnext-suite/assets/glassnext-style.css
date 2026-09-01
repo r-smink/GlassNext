@@ -86,10 +86,12 @@
 #glassnext-app .signature{border-top:1px solid #8da0ad;padding-top:7px;min-height:70px}
 #glassnext-app .pill{display:inline-block;padding:4px 9px;border-radius:999px;background:#e8f4fc;color:#176999;font-size:12px;font-weight:750}
 #glassnext-app .hidden{display:none!important}
-#glassnext-app .tooltip-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--blue2);color:#fff;font-size:10px;cursor:pointer;margin-left:4px;vertical-align:middle}
-#glassnext-app .tooltip-popover{position:fixed;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(15,36,52,.15);padding:14px;max-width:300px;font-size:13px;line-height:1.5;color:var(--text);z-index:9999}
-#glassnext-app .tooltip-popover p{margin:0}
-#glassnext-app .tooltip-popover img{max-width:100%;border-radius:6px;margin-bottom:8px;display:block}
+#glassnext-app .tooltip-icon{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--blue2);color:#fff;font-size:11px;font-weight:700;cursor:pointer;margin-left:5px;vertical-align:middle;transition:background .15s}
+#glassnext-app .tooltip-icon:hover{background:var(--blue)}
+#glassnext-app .tooltip-popover{position:fixed;background:#fff;border:1px solid #d0dae4;border-radius:12px;box-shadow:0 6px 20px rgba(15,36,52,.18);padding:16px;max-width:300px;width:max-content;font-family:inherit;font-size:14px;line-height:1.55;color:#2c3e50;z-index:99999;box-sizing:border-box}
+#glassnext-app .tooltip-popover p{margin:0;padding:0}
+#glassnext-app .tooltip-popover img{max-width:100%;width:100%;border-radius:8px;margin:0 0 10px 0;display:block;border:1px solid #e8edf2}
+#glassnext-app .tooltip-popover img:last-child{margin-bottom:0}
 #glassnext-app .choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
 #glassnext-app .measure-only{display:none}
 #glassnext-app .measure-only:not(.hidden){display:block}

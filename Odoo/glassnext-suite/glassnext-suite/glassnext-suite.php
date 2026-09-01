@@ -45,6 +45,17 @@ class GlassNext_Suite {
         wp_register_script('glassnext-tool', GN_PLUGIN_URL . 'assets/glassnext-tool.js', ['jspdf'], GN_VERSION, true);
 
         $options = GN_Options::get_all_options();
+
+        // Convert tooltip image attachment IDs to URLs for frontend use
+        $tooltip_cols = ['kenmerk', 'breedte', 'hoogte', 'aantal', 'rotatie', 'ruimte'];
+        foreach ($tooltip_cols as $col) {
+            $img_key = 'gn_tooltip_' . $col . '_image';
+            if (!empty($options[$img_key])) {
+                $url = wp_get_attachment_url($options[$img_key]);
+                $options[$img_key] = $url ?: '';
+            }
+        }
+
         wp_localize_script('glassnext-tool', 'GN_CONFIG', [
             'ajaxUrl'   => admin_url('admin-ajax.php'),
             'nonce'     => wp_create_nonce('gn_submit_offer'),
