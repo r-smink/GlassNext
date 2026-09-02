@@ -69,6 +69,14 @@
 #glassnext-app .table-wrap table{min-width:500px}
 #glassnext-app .table-wrap.scroll-hint{position:relative}
 #glassnext-app .table-wrap.scroll-hint::after{content:"";position:absolute;top:0;right:0;width:14px;height:100%;background:linear-gradient(90deg,transparent,rgba(220,230,238,.6));pointer-events:none}
+#glassnext-app .pane-header-grid,#glassnext-app .pane-row-grid{display:grid;grid-template-columns:1.1fr 0.9fr 1fr 1fr 0.9fr 1.4fr minmax(90px,auto);gap:8px;align-items:end}
+#glassnext-app .pane-header-grid{font-size:13px;color:#40586a;padding:0 0 6px}
+#glassnext-app .pane-header-cell{padding:0 4px}
+#glassnext-app .pane-row-grid .pane-label{display:none;font-size:11px;color:#3e5668;font-weight:650;margin-bottom:4px}
+#glassnext-app .pane-row-grid .pane-cell{display:flex;flex-direction:column}
+#glassnext-app .pane-row-grid input,#glassnext-app .pane-row-grid select{width:100%}
+#glassnext-app .pane-add-row{margin-top:12px;display:block;text-align:right}
+#glassnext-app .pane-add-row .btn{padding:10px 22px!important;font-size:15px}
 #glassnext-app .progress{height:9px;background:#e2e8f0;border-radius:999px;overflow:hidden}
 #glassnext-app .progress>div{height:100%;width:0;background:linear-gradient(90deg,var(--blue2),var(--blue))}
 #glassnext-app .canvas-wrap{overflow:auto;max-height:680px;border:1px solid var(--line);border-radius:9px;background:#fff;-webkit-overflow-scrolling:touch}
@@ -169,9 +177,29 @@
   #glassnext-app .table-wrap table{min-width:420px}
   #glassnext-app .table-wrap{max-height:420px}
 
-  /* Pane table inputs: keep tappable */
-  #glassnext-app #paneTable input,#glassnext-app #paneTable select{min-width:50px;font-size:16px;padding:8px}
-  #glassnext-app .tooltip-icon{width:20px;height:20px;font-size:12px}
+  /* Pane table: mobile-friendly grid, no horizontal scroll */
+  #glassnext-app .pane-table-wrap{overflow:visible;max-height:none}
+  #glassnext-app .pane-table-wrap.scroll-hint::after{display:none}
+  #glassnext-app .pane-table-wrap table{display:block;width:100%;min-width:0!important}
+  #glassnext-app #paneTable thead{display:none}
+  #glassnext-app #paneTable tbody{display:block;width:100%}
+  #glassnext-app #paneTable tbody tr{display:block;width:100%;border-bottom:1px solid var(--line);margin-bottom:12px;padding-bottom:12px}
+  #glassnext-app #paneTable tbody tr:last-child{border-bottom:0;margin-bottom:0}
+  #glassnext-app #paneTable td{display:block;width:100%;padding:0;border:0}
+  #glassnext-app .pane-header-grid{display:none}
+  #glassnext-app .pane-row-grid{grid-template-columns:1fr 1fr;gap:8px}
+  #glassnext-app .pane-row-grid .pane-label{display:block}
+  #glassnext-app .pane-row-grid .pane-kenmerk{grid-column:1;grid-row:1}
+  #glassnext-app .pane-row-grid .pane-aantal{grid-column:2;grid-row:1}
+  #glassnext-app .pane-row-grid .pane-breedte{grid-column:1;grid-row:2}
+  #glassnext-app .pane-row-grid .pane-hoogte{grid-column:2;grid-row:2}
+  #glassnext-app .pane-row-grid .pane-rotatie{grid-column:1;grid-row:3}
+  #glassnext-app .pane-row-grid .pane-ruimte{grid-column:2;grid-row:3}
+  #glassnext-app .pane-row-grid .pane-delete{grid-column:1 / -1;grid-row:4;text-align:center}
+  #glassnext-app .pane-row-grid .pane-delete .btn{width:100%;padding:12px 16px!important;font-size:15px}
+  #glassnext-app .pane-row-grid input,#glassnext-app .pane-row-grid select{font-size:16px;padding:11px 12px;min-height:44px}
+  #glassnext-app .pane-add-row{display:block}
+  #glassnext-app .pane-add-row .btn{width:100%;padding:14px 16px!important;font-size:16px}
 
   /* Choice page: single column, compact */
   #glassnext-app .choice-grid{grid-template-columns:1fr;gap:12px}

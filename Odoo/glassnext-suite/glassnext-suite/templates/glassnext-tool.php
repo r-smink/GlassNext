@@ -159,18 +159,27 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
   <article class="card span-12">
     <div class="card-head">
       <h2>Ramen invoeren</h2>
-      <div class="toolbar no-print"><button class="btn ghost" id="addPane">+ Ruitmaat</button><button class="btn secondary" id="demoPanes">Demo laden</button></div>
+      <div class="toolbar no-print"><button class="btn secondary" id="demoPanes">Demo laden</button></div>
     </div>
-    <div class="card-body table-wrap scroll-hint">
-      <table id="paneTable"><thead><tr>
-        <th><span class="th-label">Kenmerk</span> <span class="tooltip-icon" data-tooltip-col="kenmerk">&#9432;</span></th>
-        <th><span class="th-label">Breedte cm</span> <span class="tooltip-icon" data-tooltip-col="breedte">&#9432;</span></th>
-        <th><span class="th-label">Hoogte cm</span> <span class="tooltip-icon" data-tooltip-col="hoogte">&#9432;</span></th>
-        <th><span class="th-label">Aantal</span> <span class="tooltip-icon" data-tooltip-col="aantal">&#9432;</span></th>
-        <th><span class="th-label">Rotatie</span> <span class="tooltip-icon" data-tooltip-col="rotatie">&#9432;</span></th>
-        <th><span class="th-label">Ruimte / verdieping</span> <span class="tooltip-icon" data-tooltip-col="ruimte">&#9432;</span></th>
-        <th></th>
-      </tr></thead><tbody></tbody></table>
+    <div class="card-body">
+      <div class="table-wrap scroll-hint pane-table-wrap">
+        <table id="paneTable"><thead class="no-print"><tr>
+          <th colspan="7">
+            <div class="pane-header-grid">
+              <span class="pane-header-cell">Kenmerk <span class="tooltip-icon" data-tooltip-col="kenmerk">&#9432;</span></span>
+              <span class="pane-header-cell">Aantal <span class="tooltip-icon" data-tooltip-col="aantal">&#9432;</span></span>
+              <span class="pane-header-cell">Breedte cm <span class="tooltip-icon" data-tooltip-col="breedte">&#9432;</span></span>
+              <span class="pane-header-cell">Hoogte cm <span class="tooltip-icon" data-tooltip-col="hoogte">&#9432;</span></span>
+              <span class="pane-header-cell">Rotatie <span class="tooltip-icon" data-tooltip-col="rotatie">&#9432;</span></span>
+              <span class="pane-header-cell">Ruimte / verdieping <span class="tooltip-icon" data-tooltip-col="ruimte">&#9432;</span></span>
+              <span class="pane-header-cell"></span>
+            </div>
+          </th>
+        </tr></thead><tbody></tbody></table>
+      </div>
+      <div class="pane-add-row no-print">
+        <button class="btn" id="addPane">+ Ruitmaat toevoegen</button>
+      </div>
     </div>
   </article>
 

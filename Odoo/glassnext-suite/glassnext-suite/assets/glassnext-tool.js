@@ -221,15 +221,20 @@ if(consentCb){
 
 const paneBody=$("#paneTable tbody");
 function addPaneRow(p={}){
-  const tr=document.createElement("tr"),i=paneBody.children.length+1;
+  const tr=document.createElement("tr");tr.className="pane-row";
+  const i=paneBody.children.length+1;
   const rot=p.rot??$("#rotateDefault").value;
-  tr.innerHTML=`<td><input class="pid" placeholder="bijv. R1" value="${esc(p.id||``)}"></td>
-  <td><input class="pw" inputmode="decimal" placeholder="bijv. 88" value="${p.w??""}"></td>
-  <td><input class="ph" inputmode="decimal" placeholder="bijv. 68" value="${p.h??""}"></td>
-  <td><input class="pn" type="number" min="1" step="1" value="${p.n??1}"></td>
-  <td><select class="prot"><option value="1"${String(rot)==="1"?" selected":""}>Ja</option><option value="0"${String(rot)==="0"?" selected":""}>Nee</option></select></td>
-  <td><input class="proom" placeholder="bijv. Woonkamer" value="${esc(p.room||"")}"></td>
-  <td><button class="btn danger small remove">Verwijder</button></td>`;
+  tr.innerHTML=`<td colspan="7">
+    <div class="pane-row-grid">
+      <div class="pane-cell pane-kenmerk"><label class="pane-label">Kenmerk</label><input class="pid" placeholder="bijv. R1" value="${esc(p.id||``)}"></div>
+      <div class="pane-cell pane-aantal"><label class="pane-label">Aantal</label><input class="pn" type="number" min="1" step="1" value="${p.n??1}"></div>
+      <div class="pane-cell pane-breedte"><label class="pane-label">Breedte <span>cm</span></label><input class="pw" inputmode="decimal" placeholder="bijv. 88" value="${p.w??""}"></div>
+      <div class="pane-cell pane-hoogte"><label class="pane-label">Hoogte <span>cm</span></label><input class="ph" inputmode="decimal" placeholder="bijv. 68" value="${p.h??""}"></div>
+      <div class="pane-cell pane-rotatie"><label class="pane-label">Rotatie</label><select class="prot"><option value="1"${String(rot)==="1"?" selected":""}>Ja</option><option value="0"${String(rot)==="0"?" selected":""}>Nee</option></select></div>
+      <div class="pane-cell pane-ruimte"><label class="pane-label">Ruimte</label><input class="proom" placeholder="bijv. Woonkamer" value="${esc(p.room||"")}"></div>
+      <div class="pane-cell pane-delete"><button class="btn danger small remove">Verwijder</button></div>
+    </div>
+  </td>`;
   tr.querySelector(".remove").onclick=()=>tr.remove();
   paneBody.appendChild(tr);
 }
