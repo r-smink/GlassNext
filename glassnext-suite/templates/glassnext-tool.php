@@ -58,7 +58,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
       <h2>Ramen invoeren</h2>
       <div class="toolbar no-print"><button class="btn ghost" id="addPane">+ Ruitmaat</button><button class="btn secondary" id="demoPanes">Demo laden</button></div>
     </div>
-    <div class="card-body table-wrap">
+    <div class="card-body table-wrap scroll-hint">
       <table id="paneTable"><thead><tr><th>Kenmerk</th><th>Breedte cm</th><th>Hoogte cm</th><th>Aantal</th><th>Rotatie</th><th>Ruimte / verdieping</th><th></th></tr></thead><tbody></tbody></table>
     </div>
   </article>
@@ -79,7 +79,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
 
   <article class="card span-12">
     <div class="card-head"><h2>Stukkenlijst</h2></div>
-    <div class="card-body table-wrap" id="pieceReport">Nog geen snijplan berekend.</div>
+    <div class="card-body table-wrap scroll-hint" id="pieceReport">Nog geen snijplan berekend.</div>
   </article>
 </div>
 </section>
@@ -118,7 +118,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
     <div class="card-body">
       <div id="calcWarning" class="status warn">Bereken eerst een snijplan.</div>
       <div id="calcMetrics" class="metrics"></div>
-      <div class="table-wrap" style="margin-top:14px">
+      <div class="table-wrap scroll-hint" style="margin-top:14px">
         <table class="money-table"><thead><tr><th>Post</th><th>Grondslag</th><th>Tarief</th><th>Bedrag</th></tr></thead><tbody id="calcRows"></tbody></table>
       </div>
     </div>
@@ -201,7 +201,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
   <article class="card span-12">
     <div class="card-head"><h2>Besparingen en terugverdientijd</h2></div>
     <div class="card-body">
-      <div class="table-wrap"><table class="money-table"><thead><tr><th>Onderdeel</th><th>Per m² per jaar</th><th>Project per jaar</th><th>Financiële waarde per jaar</th></tr></thead><tbody id="roiRows"></tbody></table></div>
+      <div class="table-wrap scroll-hint"><table class="money-table"><thead><tr><th>Onderdeel</th><th>Per m² per jaar</th><th>Project per jaar</th><th>Financiële waarde per jaar</th></tr></thead><tbody id="roiRows"></tbody></table></div>
       <div class="summary-box" style="margin-top:14px"><b>Belangrijke voorwaarde:</b> de uitkomst is een scenarioanalyse. Werkelijke besparingen hangen onder meer af van glasopbouw, geveloriëntatie, klimaatjaar, binnentemperatuur, verwarmings- en koelinstallatie, bezetting, ventilatie en gebruik van het gebouw. De uitkomst is daarom geen gegarandeerde energiebesparing.</div>
     </div>
   </article>
