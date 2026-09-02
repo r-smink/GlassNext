@@ -19,34 +19,34 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
   <article class="card span-12">
     <div class="card-head"><h2>Welkom bij GlassNext Suite</h2></div>
     <div class="card-body">
-      <p style="font-size:15px;line-height:1.6;margin-bottom:20px">Wilt u uw beglazing isoleren met Nano-EcoLine Climate GlassShield? Kies hieronder hoe u wilt beginnen.</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px" class="choice-grid">
-        <button class="btn choice-btn" id="choiceMeasure" type="button" style="padding:24px;text-align:left;line-height:1.6">
-          <div style="font-size:18px;font-weight:800;margin-bottom:8px">Laten opmeten</div>
-          <div style="font-size:14px;opacity:.9">Wij komen bij u langs om de ruiten professioneel op te meten.</div>
-          <div style="font-size:20px;font-weight:800;margin-top:12px">€ 149,-</div>
+      <p class="choice-intro">Wilt u uw beglazing isoleren met Nano-EcoLine Climate GlassShield? Kies hieronder hoe u wilt beginnen.</p>
+      <div class="choice-grid">
+        <button class="btn choice-btn" id="choiceMeasure" type="button">
+          <div class="choice-title">Laten opmeten</div>
+          <div class="choice-desc">Wij komen bij u langs om de ruiten professioneel op te meten.</div>
+          <div class="choice-price">€ 149,-</div>
         </button>
-        <button class="btn secondary choice-btn" id="choiceSelf" type="button" style="padding:24px;text-align:left;line-height:1.6">
-          <div style="font-size:18px;font-weight:800;margin-bottom:8px">Zelf opmeten</div>
-          <div style="font-size:14px;opacity:.9">U meet zelf de ruiten op en wij maken het snijplan en offerte.</div>
-          <div style="font-size:14px;font-weight:700;margin-top:12px">Gratis</div>
+        <button class="btn secondary choice-btn" id="choiceSelf" type="button">
+          <div class="choice-title">Zelf opmeten</div>
+          <div class="choice-desc">U meet zelf de ruiten op en wij maken het snijplan en offerte.</div>
+          <div class="choice-price">Gratis</div>
         </button>
       </div>
-      <div id="installChoice" class="hidden" style="margin-top:24px">
-        <h3 style="margin:0 0 10px;font-size:16px">Wilt u de folie zelf aanbrengen of door GlassNext laten aanbrengen?</h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px" class="choice-grid">
-          <button class="btn choice-btn install-choice-btn" id="choiceInstallPro" type="button" style="padding:20px;text-align:left;line-height:1.6">
-            <div style="font-size:16px;font-weight:800;margin-bottom:6px">Folie laten aanbrengen door GlassNext</div>
-            <div style="font-size:13px;opacity:.9">Wij verzorgen de professionele aanbreng van de GlassShield folie.</div>
+      <div id="installChoice" class="hidden">
+        <h3 class="choice-subtitle">Wilt u de folie zelf aanbrengen of door GlassNext laten aanbrengen?</h3>
+        <div class="choice-grid">
+          <button class="btn choice-btn install-choice-btn" id="choiceInstallPro" type="button">
+            <div class="choice-title">Folie laten aanbrengen door GlassNext</div>
+            <div class="choice-desc">Wij verzorgen de professionele aanbreng van de GlassShield folie.</div>
           </button>
-          <button class="btn secondary choice-btn install-choice-btn" id="choiceInstallSelf" type="button" style="padding:20px;text-align:left;line-height:1.6">
-            <div style="font-size:16px;font-weight:800;margin-bottom:6px">Folie zelf aanbrengen</div>
-            <div style="font-size:13px;opacity:.9">U brengt de folie zelf aan. Wij leveren het snijplan en voorgesneden materiaal.</div>
+          <button class="btn secondary choice-btn install-choice-btn" id="choiceInstallSelf" type="button">
+            <div class="choice-title">Folie zelf aanbrengen</div>
+            <div class="choice-desc">U brengt de folie zelf aan. Wij leveren het snijplan en voorgesneden materiaal.</div>
           </button>
         </div>
       </div>
-      <div id="choiceContinue" class="hidden" style="margin-top:24px;text-align:right">
-        <button class="btn" id="choiceContinueBtn" type="button" style="min-width:180px">Doorgaan</button>
+      <div id="choiceContinue" class="hidden">
+        <button class="btn" id="choiceContinueBtn" type="button">Doorgaan</button>
       </div>
     </div>
   </article>
@@ -161,7 +161,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
       <h2>Ramen invoeren</h2>
       <div class="toolbar no-print"><button class="btn ghost" id="addPane">+ Ruitmaat</button><button class="btn secondary" id="demoPanes">Demo laden</button></div>
     </div>
-    <div class="card-body table-wrap">
+    <div class="card-body table-wrap scroll-hint">
       <table id="paneTable"><thead><tr>
         <th><span class="th-label">Kenmerk</span> <span class="tooltip-icon" data-tooltip-col="kenmerk">&#9432;</span></th>
         <th><span class="th-label">Breedte cm</span> <span class="tooltip-icon" data-tooltip-col="breedte">&#9432;</span></th>
@@ -190,7 +190,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
 
   <article class="card span-12 self-flow-only hidden">
     <div class="card-head"><h2>Stukkenlijst</h2></div>
-    <div class="card-body table-wrap" id="pieceReport">Nog geen snijplan berekend.</div>
+    <div class="card-body table-wrap scroll-hint" id="pieceReport">Nog geen snijplan berekend.</div>
   </article>
 </div>
 <div class="page-nav no-print">
@@ -233,7 +233,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
     <div class="card-body">
       <div id="calcWarning" class="status warn">Bereken eerst een snijplan.</div>
       <div id="calcMetrics" class="metrics"></div>
-      <div class="table-wrap" style="margin-top:14px">
+      <div class="table-wrap scroll-hint" style="margin-top:14px">
         <table class="money-table"><thead><tr><th>Post</th><th>Grondslag</th><th>Tarief</th><th>Bedrag</th></tr></thead><tbody id="calcRows"></tbody></table>
       </div>
     </div>
@@ -320,7 +320,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
   <article class="card span-12">
     <div class="card-head"><h2>Besparingen en terugverdientijd</h2></div>
     <div class="card-body">
-      <div class="table-wrap"><table class="money-table"><thead><tr><th>Onderdeel</th><th>Per m² per jaar</th><th>Project per jaar</th><th>Financiële waarde per jaar</th></tr></thead><tbody id="roiRows"></tbody></table></div>
+      <div class="table-wrap scroll-hint"><table class="money-table"><thead><tr><th>Onderdeel</th><th>Per m² per jaar</th><th>Project per jaar</th><th>Financiële waarde per jaar</th></tr></thead><tbody id="roiRows"></tbody></table></div>
       <div class="summary-box" style="margin-top:14px"><b>Belangrijke voorwaarde:</b> de uitkomst is een scenarioanalyse. Werkelijke besparingen hangen onder meer af van glasopbouw, geveloriëntatie, klimaatjaar, binnentemperatuur, verwarmings- en koelinstallatie, bezetting, ventilatie en gebruik van het gebouw. De uitkomst is daarom geen gegarandeerde energiebesparing.</div>
     </div>
   </article>

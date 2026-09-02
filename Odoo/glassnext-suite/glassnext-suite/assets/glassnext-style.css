@@ -65,11 +65,17 @@
 #glassnext-app table{width:100%;border-collapse:collapse}
 #glassnext-app th,#glassnext-app td{padding:8px;border-bottom:1px solid #edf2f6;font-size:13px;text-align:left;vertical-align:middle}
 #glassnext-app th{background:#f6f9fb;color:#40586a;position:sticky;top:0}
-#glassnext-app .table-wrap{overflow:auto;max-height:550px}
+#glassnext-app .table-wrap{overflow:auto;max-height:550px;-webkit-overflow-scrolling:touch}
+#glassnext-app .table-wrap table{min-width:500px}
+#glassnext-app .table-wrap.scroll-hint{position:relative}
+#glassnext-app .table-wrap.scroll-hint::after{content:"";position:absolute;top:0;right:0;width:14px;height:100%;background:linear-gradient(90deg,transparent,rgba(220,230,238,.6));pointer-events:none}
 #glassnext-app .progress{height:9px;background:#e2e8f0;border-radius:999px;overflow:hidden}
 #glassnext-app .progress>div{height:100%;width:0;background:linear-gradient(90deg,var(--blue2),var(--blue))}
-#glassnext-app .canvas-wrap{overflow:auto;max-height:680px;border:1px solid var(--line);border-radius:9px;background:#fff}
-#glassnext-app canvas{display:block;background:#fff}
+#glassnext-app .canvas-wrap{overflow:auto;max-height:680px;border:1px solid var(--line);border-radius:9px;background:#fff;-webkit-overflow-scrolling:touch}
+#glassnext-app canvas{display:block;background:#fff;max-width:100%;height:auto}
+#glassnext-app .choice-btn.selected{cursor:default}
+#glassnext-app .choice-btn:focus{outline:2px solid var(--blue2);outline-offset:2px}
+#glassnext-app .install-choice-btn.selected{outline:3px solid var(--blue2);outline-offset:2px}
 #glassnext-app .legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;margin:9px 0}
 #glassnext-app .sw{width:15px;height:10px;border-radius:3px;border:1px solid #8aa0b1;display:inline-block}
 #glassnext-app .summary-box{border-left:4px solid var(--blue);background:#f2f8fd;padding:12px;border-radius:8px;line-height:1.5}
@@ -93,27 +99,123 @@
 #glassnext-app .tooltip-popover img{max-width:100%;width:100%;border-radius:8px;margin:0 0 10px 0;display:block;border:1px solid #e8edf2}
 #glassnext-app .tooltip-popover img:last-child{margin-bottom:0}
 #glassnext-app .choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+#glassnext-app .choice-intro{font-size:15px;line-height:1.6;margin-bottom:20px}
+#glassnext-app .choice-subtitle{margin:24px 0 10px;font-size:16px}
 #glassnext-app .measure-only{display:none}
 #glassnext-app .measure-only:not(.hidden){display:block}
-#glassnext-app .choice-btn{background:#fff!important;color:var(--blue)!important;border:1.5px solid var(--blue)!important;transition:background .15s,color .15s,border-color .15s!important}
+#glassnext-app .choice-btn{background:#fff!important;color:var(--blue)!important;border:1.5px solid var(--blue)!important;transition:background .15s,color .15s,border-color .15s!important;padding:24px!important;text-align:left!important;line-height:1.6;white-space:normal;word-break:break-word}
 #glassnext-app .choice-btn:hover{filter:none!important;background:#eef4fb!important}
 #glassnext-app .choice-btn.selected{background:var(--blue)!important;color:#fff!important;border-color:var(--blue)!important}
 #glassnext-app .choice-btn.selected:hover{filter:brightness(1.1)!important;background:var(--blue)!important}
+#glassnext-app .choice-title{font-size:18px;font-weight:800;margin-bottom:8px}
+#glassnext-app .choice-desc{font-size:14px;opacity:.9}
+#glassnext-app .choice-price{font-size:20px;font-weight:800;margin-top:12px}
+#glassnext-app .install-choice-btn{padding:20px!important}
+#glassnext-app .install-choice-btn .choice-title{font-size:16px}
+#glassnext-app .install-choice-btn .choice-desc{font-size:13px}
 #glassnext-app .install-choice-btn.selected{outline:3px solid var(--blue2);outline-offset:2px}
 #glassnext-app .install-choice-btn{transition:outline .15s}
-@media(max-width:650px){#glassnext-app .choice-grid{grid-template-columns:1fr}}
+#glassnext-app #choiceContinue{margin-top:24px;text-align:right}
+#glassnext-app #choiceContinueBtn{min-width:180px}
 @media(max-width:950px){
   #glassnext-app .span-8,#glassnext-app .span-7,#glassnext-app .span-6,#glassnext-app .span-5,#glassnext-app .span-4{grid-column:span 12}
   #glassnext-app .fields.three{grid-template-columns:1fr 1fr}
+  #glassnext-app .doc h1{font-size:20px}
+  #glassnext-app .doc h3{font-size:16px}
 }
 @media(max-width:650px){
   #glassnext-app .shell{padding:10px}
   #glassnext-app .fields,#glassnext-app .fields.three{grid-template-columns:1fr}
-  #glassnext-app .topbar{position:static}
+  #glassnext-app .topbar{position:static;padding:10px 12px;gap:10px}
+  #glassnext-app .brand{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #glassnext-app .tagline{display:none}
   #glassnext-app .doc{padding:15px}
   #glassnext-app .signature-grid{grid-template-columns:1fr}
-  #glassnext-app .top-logo{height:44px;max-width:92px}
+  #glassnext-app .top-logo{height:40px;max-width:80px;padding:2px}
   #glassnext-app .other-cost-row,#glassnext-app .mount-rate-line{grid-template-columns:1fr}
+
+  /* Tab navigation: horizontal scroll strip */
+  #glassnext-app .tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-bottom:10px;gap:5px}
+  #glassnext-app .tabs::-webkit-scrollbar{display:none}
+  #glassnext-app .tab{white-space:nowrap;flex-shrink:0;padding:9px 12px;font-size:13px}
+
+  /* Touch-friendly inputs: 16px prevents iOS auto-zoom */
+  #glassnext-app input,#glassnext-app select,#glassnext-app textarea{font-size:16px;padding:11px 12px;min-height:44px}
+  #glassnext-app textarea{min-height:82px}
+  #glassnext-app label{font-size:13px}
+
+  /* Touch-friendly buttons */
+  #glassnext-app .btn{padding:12px 16px!important;min-height:44px;font-size:15px}
+  #glassnext-app .btn.small{padding:10px 12px!important;min-height:38px;font-size:13px}
+
+  /* Toolbar: full-width stack */
+  #glassnext-app .toolbar{flex-direction:column;gap:8px;width:100%}
+  #glassnext-app .toolbar .btn{width:100%;text-align:center}
+
+  /* Page navigation: full-width stack */
+  #glassnext-app .page-nav{flex-direction:column;gap:10px;margin-top:16px;padding-top:14px}
+  #glassnext-app .page-nav .btn{width:100%;min-width:auto}
+
+  /* Card headers: stack title + toolbar vertically */
+  #glassnext-app .card-head{flex-direction:column;align-items:flex-start;gap:10px}
+
+  /* Metrics grid: tighter for small screens */
+  #glassnext-app .metrics{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
+  #glassnext-app .metric{padding:10px}
+  #glassnext-app .metric strong{font-size:17px}
+
+  /* Data tables: tighter padding */
+  #glassnext-app th,#glassnext-app td{padding:6px 5px;font-size:12px}
+  #glassnext-app .table-wrap table{min-width:420px}
+  #glassnext-app .table-wrap{max-height:420px}
+
+  /* Pane table inputs: keep tappable */
+  #glassnext-app #paneTable input,#glassnext-app #paneTable select{min-width:50px;font-size:16px;padding:8px}
+  #glassnext-app .tooltip-icon{width:20px;height:20px;font-size:12px}
+
+  /* Choice page: single column, compact */
+  #glassnext-app .choice-grid{grid-template-columns:1fr;gap:12px}
+  #glassnext-app .choice-btn{padding:14px 16px!important;text-align:left!important;min-height:44px}
+  #glassnext-app .choice-btn div{font-size:15px!important}
+  #glassnext-app .choice-btn div:nth-child(2){font-size:13px!important;opacity:.9}
+  #glassnext-app .choice-btn div:nth-child(3){font-size:18px!important;margin-top:8px!important}
+  #glassnext-app .install-choice-btn{padding:12px 14px!important}
+  #glassnext-app #choiceContinue{text-align:center!important}
+  #glassnext-app #choiceContinueBtn{width:100%;max-width:none;min-width:auto}
+
+  /* Photo upload */
+  #glassnext-app #photoUploadArea{gap:8px;justify-content:center}
+  #glassnext-app .photo-slot .btn.secondary{width:90px!important;height:90px!important}
+  #glassnext-app .photo-preview{width:90px!important;height:90px!important}
+  #glassnext-app .photo-slot .btn.secondary span:first-child{font-size:24px!important}
+  #glassnext-app .photo-slot .btn.secondary span:last-child{font-size:10px!important}
+
+  /* Offer document: scrollable tables */
+  #glassnext-app .doc table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap}
+  #glassnext-app .doc-head{flex-direction:column;gap:8px}
+  #glassnext-app .doc h1{font-size:18px}
+  #glassnext-app .doc h3{font-size:15px}
+  #glassnext-app .doc-brand{font-size:20px}
+
+  /* Tooltip popover mobile: fit to viewport */
+  #glassnext-app .tooltip-popover{max-width:92vw;width:auto;left:4vw!important;right:4vw!important;padding:12px;font-size:13px}
+
+  /* Consent label */
+  #glassnext-app #offerConsent + span{font-size:13px}
+}
+@media(max-width:400px){
+  #glassnext-app .shell{padding:8px}
+  #glassnext-app .metrics{grid-template-columns:1fr}
+  #glassnext-app .card-body{padding:10px 12px}
+  #glassnext-app .tab{padding:8px 10px;font-size:12px}
+  #glassnext-app .doc{padding:10px}
+  #glassnext-app .toolbar .btn{font-size:14px;padding:10px 12px!important}
+  #glassnext-app .btn{font-size:14px;padding:10px 12px!important;min-height:40px}
+  #glassnext-app .choice-btn{padding:12px 14px!important}
+  #glassnext-app .choice-btn div{font-size:14px!important}
+  #glassnext-app .choice-btn div:nth-child(3){font-size:16px!important}
+  #glassnext-app .page-nav .btn{font-size:14px}
+  #glassnext-app .table-wrap table{min-width:360px}
 }
 @media print{
   #glassnext-app .topbar,#glassnext-app .tabs,#glassnext-app .no-print{display:none!important}
