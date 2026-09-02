@@ -2,14 +2,14 @@
 /**
  * Plugin Name: GlassNext Suite
  * Description: Klant-facing tool voor snijplanner, calculatie, ROI en offerte aanvraag.
- * Version: 1.8.2
+ * Version: 1.6.0
  * Author: GlassNext
  * Text Domain: glassnext-suite
  */
 
 if (!defined('ABSPATH')) exit;
 
-define('GN_VERSION', '1.8.2');
+define('GN_VERSION', '1.6.0');
 define('GN_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('GN_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('GN_PLUGIN_BASENAME', plugin_basename(__FILE__));

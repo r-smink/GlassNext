@@ -77,18 +77,15 @@ function renderNavButtons(current){
     }
   }
 }
-let installModeValue='professional';
-function installMode(){return installModeValue}
-function setInstallMode(mode){
-  installModeValue=mode;
-  const el=$('#installModeValue');if(el)el.value=mode;
+function installMode(){return document.querySelector('input[name="installMode"]:checked')?.value||"professional"}
+$$('input[name="installMode"]').forEach(r=>r.addEventListener("change",()=>{
   if(lastPlan){calculatePrices();if(lastROI)calculateROI()}
   if(typeof renderOffer==="function"&&$("#offerDoc").innerHTML)renderOffer();
-}
-let uploadedPhotos=[null,null,null];
+}));
 
 function setFlowMode(mode){
   flowMode=mode;
+  const choiceTab=$('.tab[data-page="choice"]');
   const plannerTab=$('.tab[data-page="planner"]');
   const calcTab=$('.tab[data-page="calc"]');
   const roiTab=$('.tab[data-page="roi"]');
@@ -99,6 +96,7 @@ function setFlowMode(mode){
   const submitOfferBtn=$('#submitOffer');
 
   if(mode==="measure"){
+    if(choiceTab)choiceTab.classList.add('hidden');
     if(plannerTab)plannerTab.classList.add('hidden');
     if(calcTab)calcTab.classList.add('hidden');
     if(roiTab)roiTab.classList.add('hidden');
@@ -109,6 +107,7 @@ function setFlowMode(mode){
     $$('.self-flow-only').forEach(el=>el.classList.add('hidden'));
     activatePage('project');
   } else if(mode==="self"){
+    if(choiceTab)choiceTab.classList.add('hidden');
     if(plannerTab)plannerTab.classList.remove('hidden');
     if(calcTab)calcTab.classList.remove('hidden');
     if(roiTab)roiTab.classList.remove('hidden');
@@ -117,52 +116,16 @@ function setFlowMode(mode){
     if(measureDates)measureDates.classList.add('hidden');
     if(projectSubmit){projectSubmit.textContent='Volgende';projectSubmit.id='projectSubmit';}
     $$('.self-flow-only').forEach(el=>el.classList.add('hidden'));
+    const profRadio=document.querySelector('input[name="installMode"][value="professional"]');
+    if(profRadio)profRadio.checked=true;
     activatePage('planner');
   }
 }
 
-let pendingFlowMode=null;
-const choiceSelfBtn=$('#choiceSelf');
 const choiceMeasureBtn=$('#choiceMeasure');
-if(choiceMeasureBtn)choiceMeasureBtn.onclick=()=>{
-  pendingFlowMode='measure';
-  choiceMeasureBtn.classList.add('selected');
-  if(choiceSelfBtn)choiceSelfBtn.classList.remove('selected');
-  showInstallChoice();
-};
-if(choiceSelfBtn)choiceSelfBtn.onclick=()=>{
-  pendingFlowMode='self';
-  choiceSelfBtn.classList.add('selected');
-  if(choiceMeasureBtn)choiceMeasureBtn.classList.remove('selected');
-  showInstallChoice();
-};
-function showInstallChoice(){
-  const installChoice=$('#installChoice');
-  const choiceContinue=$('#choiceContinue');
-  if(installChoice)installChoice.classList.remove('hidden');
-  if(choiceContinue)choiceContinue.classList.add('hidden');
-  $$('.install-choice-btn').forEach(b=>b.classList.remove('selected'));
-}
-const choiceInstallProBtn=$('#choiceInstallPro');
-if(choiceInstallProBtn)choiceInstallProBtn.onclick=()=>{
-  setInstallChoice('professional');
-};
-const choiceInstallSelfBtn=$('#choiceInstallSelf');
-if(choiceInstallSelfBtn)choiceInstallSelfBtn.onclick=()=>{
-  setInstallChoice('self');
-};
-function setInstallChoice(mode){
-  setInstallMode(mode);
-  $$('.install-choice-btn').forEach(b=>b.classList.remove('selected'));
-  const btn=mode==='professional'?$('#choiceInstallPro'):$('#choiceInstallSelf');
-  if(btn)btn.classList.add('selected');
-  const choiceContinue=$('#choiceContinue');
-  if(choiceContinue)choiceContinue.classList.remove('hidden');
-}
-const choiceContinueBtn=$('#choiceContinueBtn');
-if(choiceContinueBtn)choiceContinueBtn.onclick=()=>{
-  if(pendingFlowMode)setFlowMode(pendingFlowMode);
-};
+if(choiceMeasureBtn)choiceMeasureBtn.onclick=()=>setFlowMode('measure');
+const choiceSelfBtn=$('#choiceSelf');
+if(choiceSelfBtn)choiceSelfBtn.onclick=()=>setFlowMode('self');
 
 function initTooltips(){
   const cols=['kenmerk','breedte','hoogte','aantal','rotatie','ruimte'];
@@ -207,7 +170,6 @@ document.addEventListener("click",e=>{
   const btn=e.target.closest(".nav-prev, .nav-next");
   if(!btn||btn.disabled)return;
   if(btn.id==="submitOffer")return;
-  if(btn.id==="plannerNext"&&flowMode==="self")return;
   const t=btn.dataset.target;
   if(t)activatePage(t);
 });
@@ -414,19 +376,18 @@ function calculatePrices(){
   $("#calcWarning").innerHTML='<span class="ok">Calculatie bijgewerkt op basis van het actuele snijplan.</span>';
   $("#calcMetrics").innerHTML=`<div class="metric">Netto glas<strong>${fmtN(s.netArea)} m²</strong></div><div class="metric">Te factureren materiaal<strong>${fmtN(s.rollArea)} m²</strong></div><div class="metric">Aantal voorgesneden stukken<strong>${pieces}</strong></div><div class="metric">Montageklasse<strong>${mountClassText()}</strong></div>`;
   const otherRows=otherCosts.filter(x=>x.amount>0).map(x=>`<tr><td>${esc(x.description||"Overige kosten")}</td><td>Overige kosten</td><td></td><td>${fmtMoney(x.amount)}</td></tr>`).join("");
-  const voorrijdRow=(flowMode==='measure'||!selfInstall)?`<tr><td>Voorrijdkosten</td><td>Nader te berekenen</td><td></td><td>Nader te berekenen</td></tr>`:"";
+  const voorrijdRow=`<tr><td>Voorrijdkosten</td><td>Nader te berekenen</td><td></td><td>Nader te berekenen</td></tr>`;
   $("#calcRows").innerHTML=`
     <tr><td>GlassShield materiaal</td><td>${fmtN(s.rollArea)} m² rolverbruik</td><td>${fmtMoney(matRate)}/m²</td><td>${fmtMoney(matGross)}</td></tr>
     ${matDisc?`<tr><td>Materiaalkorting</td><td>${fmtN(num($("#materialDiscount").value),1)}%</td><td></td><td>- ${fmtMoney(matDisc)}</td></tr>`:""}
     <tr><td>Voorsnijden</td><td>${pieces} stukken</td><td>${fmtMoney(cutRate)}/stuk</td><td>${fmtMoney(cut)}</td></tr>
-    ${selfInstall?"":`<tr><td>Montage</td><td>${fmtN(mountArea)} m²</td><td></td><td>Nader te berekenen*</td></tr>`}
+    ${selfInstall?"":`<tr><td>Montage – ${mountClassText()}</td><td>${fmtN(mountArea)} m²</td><td>${fmtMoney(mountRate)}/m²</td><td>${fmtMoney(mountGross)}</td></tr>`}
     ${mountDisc?`<tr><td>Montagekorting</td><td>${fmtN(num($("#mountDiscount").value),1)}%</td><td></td><td>- ${fmtMoney(mountDisc)}</td></tr>`:""}
     ${otherRows}
     ${voorrijdRow}
     <tr class="total-row"><td colspan="3">Totaal excl. btw</td><td>${fmtMoney(subtotal)}</td></tr>
     <tr><td colspan="3">${fmtN(lastCalc.vatRate,1)}% btw</td><td>${fmtMoney(vat)}</td></tr>
-    <tr class="grand-row"><td colspan="3">Totaal incl. btw</td><td>${fmtMoney(total)}</td></tr>
-    ${selfInstall?"":`<tr><td colspan="4" style="font-size:11px;color:var(--muted);padding-top:8px">* Nader te berekenen op basis van ingevulde gegevens en aangeleverde foto's.</td></tr>`}`;
+    <tr class="grand-row"><td colspan="3">Totaal incl. btw</td><td>${fmtMoney(total)}</td></tr>`;
   if($("#roiInvestmentSource")&&$("#roiInvestmentSource").value==="calculation")$("#roiInvestment").value=subtotal.toFixed(2);
   return lastCalc;
 }
@@ -436,17 +397,10 @@ function projectData(){
   const ids=["offerNumber","customerName","contactName","email","phone","address","city","projectDescription","projectNotes"];
   const data=Object.fromEntries(ids.map(id=>[id,$("#"+id).value]));
   data.flowMode=flowMode;
-  data.installMode=installMode();
   if(flowMode==="measure"){
     data.prefDate1=$("#prefDate1")?.value||"";
     data.prefDate2=$("#prefDate2")?.value||"";
     data.prefDate3=$("#prefDate3")?.value||"";
-    data.prefDay1=$("#prefDay1")?.value||"";
-    data.prefDay2=$("#prefDay2")?.value||"";
-    data.prefDay3=$("#prefDay3")?.value||"";
-    data.prefTime1=$("#prefTime1")?.value||"";
-    data.prefTime2=$("#prefTime2")?.value||"";
-    data.prefTime3=$("#prefTime3")?.value||"";
   }
   return data;
 }
@@ -582,10 +536,10 @@ function renderOffer(){
     <tr><td>${fmtN(s.rollArea)} m² Nano-EcoLine Climate GlassShield à ${fmtMoney(c.matRate)}/m²</td><td>${fmtMoney(c.matGross)}</td></tr>
     ${c.matDisc?`<tr><td>Projectkorting materiaal</td><td>- ${fmtMoney(c.matDisc)}</td></tr>`:""}
     <tr><td>Voorsnijden ${c.pieces} stuks à ${fmtMoney(c.cutRate)}</td><td>${fmtMoney(c.cut)}</td></tr>
-    ${c.selfInstall?"":`<tr><td>Aanbrengen GlassShield – montageklasse ${mountClassText()} (${fmtN(c.mountArea)} m²)</td><td>Nader te berekenen</td></tr>`}
+    ${c.selfInstall?"":`<tr><td>Aanbrengen GlassShield – montageklasse ${mountClassText()} (${fmtN(c.mountArea)} m² à ${fmtMoney(c.mountRate)}/m²)</td><td>${fmtMoney(c.mountGross)}</td></tr>`}
     ${c.selfInstall?"":(c.mountDisc?`<tr><td>Projectkorting montage</td><td>- ${fmtMoney(c.mountDisc)}</td></tr>`:"")}
     ${(c.otherCosts||[]).filter(x=>x.amount>0).map(x=>`<tr><td>${esc(x.description||"Overige kosten")}</td><td>${fmtMoney(x.amount)}</td></tr>`).join("")}
-    ${(flowMode==='measure'||!c.selfInstall)?`<tr><td>Voorrijdkosten</td><td>Nader te berekenen</td></tr>`:""}
+    <tr><td>Voorrijdkosten</td><td>Nader te berekenen</td></tr>
     <tr class="total-row"><td>Totaal excl. btw</td><td>${fmtMoney(c.subtotal)}</td></tr><tr><td>${fmtN(c.vatRate,1)}% btw</td><td>${fmtMoney(c.vat)}</td></tr><tr class="grand-row"><td>Totaal incl. btw</td><td>${fmtMoney(c.total)}</td></tr></tbody></table>
     ${c.selfInstall?"":`<h3>Werkzaamheden montage</h3><ul><li>Bevochtigen en reinigen van de glasoppervlakken</li><li>Voorbereiden en positioneren van GlassShield</li><li>Verwijderen van vocht en luchtinsluitingen</li><li>Schoonsnijden en afwerken van de folie</li><li>Reinigen van glas, kozijnen en vensterbanken</li></ul>`}
     ${p.projectNotes?`<h3>Bijzonderheden</h3><p>${esc(p.projectNotes)}</p>`:""}
@@ -657,9 +611,9 @@ function docToPDF(type){
       [`GlassShield materiaal`,c.matGross],
       [`Materiaalkorting`,-c.matDisc],
       [`Voorsnijden (${c.pieces} stuks)`,c.cut],
-      ...(c.selfInstall?[]:[[`Montage – ${mountClassText()}`,`Nader te berekenen`],[`Montagekorting`,-c.mountDisc]]),
+      ...(c.selfInstall?[]:[[`Montage – ${mountClassText()}`,c.mountGross],[`Montagekorting`,-c.mountDisc]]),
       ...(c.otherCosts||[]).map(x=>[x.description||"Overige kosten",x.amount]),
-      ...((flowMode==='measure'||!c.selfInstall)?[[`Voorrijdkosten`,`Nader te berekenen`]]:[])
+      [`Voorrijdkosten`,`Nader te berekenen`]
     ];
     offerCostRows.filter(x=>typeof x[1]==="string"||Math.abs(x[1])>.001).forEach(([t,v])=>{doc.text(String(t),15,y,{maxWidth:145});doc.text(typeof v==="string"?v:fmtMoney(v),195,y,{align:"right"});y+=7});
     doc.line(15,y,195,y);y+=7;doc.setFont("helvetica","bold");doc.text("Totaal excl. btw",15,y);doc.text(fmtMoney(c.subtotal),195,y,{align:"right"});y+=7;doc.setFont("helvetica","normal");doc.text(`${fmtN(c.vatRate,1)}% btw`,15,y);doc.text(fmtMoney(c.vat),195,y,{align:"right"});y+=8;doc.setFont("helvetica","bold");doc.text("Totaal incl. btw",15,y);doc.text(fmtMoney(c.total),195,y,{align:"right"});
@@ -677,17 +631,10 @@ function collectProject(){
     values.prefDate1=$("#prefDate1")?.value||"";
     values.prefDate2=$("#prefDate2")?.value||"";
     values.prefDate3=$("#prefDate3")?.value||"";
-    values.prefDay1=$("#prefDay1")?.value||"";
-    values.prefDay2=$("#prefDay2")?.value||"";
-    values.prefDay3=$("#prefDay3")?.value||"";
-    values.prefTime1=$("#prefTime1")?.value||"";
-    values.prefTime2=$("#prefTime2")?.value||"";
-    values.prefTime3=$("#prefTime3")?.value||"";
   }
   const panes=$$("#paneTable tbody tr").map(tr=>({id:tr.querySelector(".pid").value,w:tr.querySelector(".pw").value,h:tr.querySelector(".ph").value,n:tr.querySelector(".pn").value,rot:tr.querySelector(".prot").value,room:tr.querySelector(".proom").value}));
   const workorderData=lastPlan?renderWorkorderHTML():null;
   const exportData=lastPlan?{project:$("#customerName").value,pieces:lastPlan.placed.length,rollLength:lastPlan.totalLen/1000,rollArea:lastPlan.stats.rollArea,roiStatus:lastROI?"Berekend":"Nog niet berekend"}:null;
-  console.log('[GN] collectProject exportData=', exportData);
   const planData=lastPlan?{
     rollW:lastPlan.rollW,
     totalLen:lastPlan.totalLen,
@@ -698,7 +645,6 @@ function collectProject(){
       netW:p.item.netW,netH:p.item.netH,rotated:p.rotated,margin:p.item.margin
     }))
   }:null;
-  console.log('[GN] collectProject planData=', planData?{placed:planData.placed.length,rollW:planData.rollW,totalLen:planData.totalLen}:null);
   return{version:"GlassNext Suite v5.0-WP",savedAt:new Date().toISOString(),values,panes,otherCosts:readOtherCosts(),workorderData,exportData,planData};
 }
 function renderWorkorderHTML(){
@@ -712,33 +658,13 @@ function renderExportSummary(){
   $("#exportSummary").innerHTML=lastPlan?`<div class="metrics"><div class="metric">Project<strong>${esc(p.customerName)}</strong></div><div class="metric">Aantal stukken<strong>${lastPlan.placed.length}</strong></div><div class="metric">Rollengte<strong>${fmtN(lastPlan.totalLen/1000)} m</strong></div><div class="metric">Rolverbruik<strong>${fmtN(lastPlan.stats.rollArea)} m²</strong></div><div class="metric">ROI-status<strong>${lastROI?"Berekend":"Nog niet berekend"}</strong></div></div>`:`<p class="warn">Er is nog geen snijplan beschikbaar.</p>`;
 }
 
-async function submitOffer(){
-  console.log('[GN] submitOffer called, flowMode=', flowMode, 'lastPlan=', !!lastPlan);
+function submitOffer(){
   const cb=$("#offerConsent");
   if(cb&&!cb.checked)return alert("U moet akkoord gaan met de voorwaarden voordat u een offerte kunt aanvragen.");
   const p=projectData();
   if(!p.customerName||!p.customerName.trim())return alert("Vul uw klant / organisatie naam in.");
   if(!p.email||!p.email.trim())return alert("Vul uw e-mailadres in.");
-  if(flowMode!=="measure"&&!lastPlan){
-    console.log('[GN] No lastPlan, generating...');
-    const rollW=num($("#rollW").value),rollL=num($("#rollL").value),kerf=Math.max(0,num($("#kerf").value)||0),{items,errors}=readItems();
-    console.log('[GN] rollW=', rollW, 'rollL=', rollL, 'items=', items.length, 'errors=', errors);
-    if(errors.length)return alert(errors.join("\n"));
-    if(!(rollW>0&&rollL>0))return alert("Voer geldige rolmaten in.");
-    const tooWide=items.filter(x=>Math.min(x.w,x.canRotate?x.h:x.w)>rollW+EPS);
-    if(tooWide.length)return alert(`Past niet op de rol: ${tooWide.map(x=>x.label).join(", ")}`);
-    const btn0=$("#submitOffer");if(btn0){btn0.disabled=true;btn0.textContent="Berekenen…";}
-    try{
-      const res=await optimize(items,rollW,kerf,parseInt($("#quality").value,10));
-      console.log('[GN] optimize result=', !!res);
-      if(!res){if(btn0){btn0.disabled=false;btn0.textContent="Offerte aanvragen";}return alert("Geen geldige indeling gevonden.");}
-      renderPlan(res,rollW,rollL,kerf);
-      console.log('[GN] renderPlan done, lastPlan=', !!lastPlan);
-    }finally{
-      if(btn0){btn0.disabled=false;btn0.textContent="Offerte aanvragen";}
-    }
-  }
-  console.log('[GN] Proceeding with submit, lastPlan=', !!lastPlan);
+  if(flowMode!=="measure"&&!lastPlan)return alert("Bereken eerst een snijplan voordat u een offerte aanvraagt.");
   const btn=$("#submitOffer");btn.disabled=true;const orig=btn.textContent;btn.textContent="Verzenden…";
   $("#submitStatus").innerHTML='<span class="note">Uw aanvraag wordt verzonden…</span>';
   const data=collectProject();
@@ -753,19 +679,11 @@ async function submitOffer(){
   formData.append("address",p.address);
   formData.append("city",p.city);
   formData.append("flow_mode",flowMode||"self");
-  formData.append("install_mode",installMode());
   if(flowMode==="measure"){
     formData.append("pref_date1",p.prefDate1||"");
     formData.append("pref_date2",p.prefDate2||"");
     formData.append("pref_date3",p.prefDate3||"");
-    formData.append("pref_day1",p.prefDay1||"");
-    formData.append("pref_day2",p.prefDay2||"");
-    formData.append("pref_day3",p.prefDay3||"");
-    formData.append("pref_time1",p.prefTime1||"");
-    formData.append("pref_time2",p.prefTime2||"");
-    formData.append("pref_time3",p.prefTime3||"");
   }
-  uploadedPhotos.forEach((photo,i)=>{if(photo)formData.append("photo_"+i,photo.blob,photo.name)});
   if(flowMode!=="measure"&&lastPlan){
     try{
       const pdfDataUri=generatePlanPDFBase64();
@@ -799,16 +717,7 @@ $("#submitOffer").onclick=submitOffer;
 
 const plannerNextBtn=$('#plannerNext');
 if(plannerNextBtn)plannerNextBtn.addEventListener('click',async e=>{
-  if(flowMode==='self'){
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
-    if(!lastPlan){
-      await calculateAndProceed();
-    }else{
-      activatePage('calc');
-    }
-  }
+  if(flowMode==='self'){e.preventDefault();e.stopPropagation();await calculateAndProceed();}
 });
 
 const projectSubmitBtn=$('#projectSubmit');
@@ -839,17 +748,9 @@ if(projectSubmitBtn)projectSubmitBtn.addEventListener('click',e=>{
       formData.append("address",p.address);
       formData.append("city",p.city);
       formData.append("flow_mode","measure");
-      formData.append("install_mode",installMode());
       formData.append("pref_date1",p.prefDate1||"");
       formData.append("pref_date2",p.prefDate2||"");
       formData.append("pref_date3",p.prefDate3||"");
-      formData.append("pref_day1",p.prefDay1||"");
-      formData.append("pref_day2",p.prefDay2||"");
-      formData.append("pref_day3",p.prefDay3||"");
-      formData.append("pref_time1",p.prefTime1||"");
-      formData.append("pref_time2",p.prefTime2||"");
-      formData.append("pref_time3",p.prefTime3||"");
-      uploadedPhotos.forEach((photo,i)=>{if(photo)formData.append("photo_"+i,photo.blob,photo.name)});
       fetch(ajaxUrl,{method:"POST",body:formData})
         .then(r=>r.json())
         .then(resp=>{
@@ -871,63 +772,7 @@ if(projectSubmitBtn)projectSubmitBtn.addEventListener('click',e=>{
   }
 });
 
-function initPhotoUpload(){
-  $$('.photo-pick-btn').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const slot=btn.dataset.slot;
-      const input=$('#photoFile'+slot);
-      if(input)input.click();
-    });
-  });
-  $$('.photo-input').forEach(input=>{
-    input.addEventListener('change',async e=>{
-      const file=e.target.files[0];
-      if(!file)return;
-      const slot=input.id.replace('photoFile','');
-      const compressed=await compressImage(file,1280,0.85);
-      uploadedPhotos[parseInt(slot)]={blob:compressed,name:file.name};
-      const img=$('#photoImg'+slot);
-      const preview=$('#photoPreview'+slot);
-      const pickBtn=$(`.photo-pick-btn[data-slot="${slot}"]`);
-      if(img){img.src=URL.createObjectURL(compressed)}
-      if(preview)preview.style.display='block';
-      if(pickBtn)pickBtn.style.display='none';
-    });
-  });
-  $$('.photo-remove-btn').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const slot=btn.dataset.slot;
-      uploadedPhotos[parseInt(slot)]=null;
-      const input=$('#photoFile'+slot);
-      if(input)input.value='';
-      const preview=$('#photoPreview'+slot);
-      const pickBtn=$(`.photo-pick-btn[data-slot="${slot}"]`);
-      if(preview)preview.style.display='none';
-      if(pickBtn)pickBtn.style.display='flex';
-    });
-  });
-}
-function compressImage(file,maxDim,quality){
-  return new Promise(resolve=>{
-    const reader=new FileReader();
-    reader.onload=e=>{
-      const img=new Image();
-      img.onload=()=>{
-        const canvas=document.createElement('canvas');
-        let w=img.width,h=img.height;
-        if(w>maxDim||h>maxDim){if(w>h){h=Math.round(h*maxDim/w);w=maxDim}else{w=Math.round(w*maxDim/h);h=maxDim}}
-        canvas.width=w;canvas.height=h;
-        canvas.getContext('2d').drawImage(img,0,0,w,h);
-        canvas.toBlob(blob=>resolve(blob),'image/jpeg',quality);
-      };
-      img.src=e.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
 initConfig();
 applyROIProfile();
 initTooltips();
-initPhotoUpload();
 }

@@ -87,16 +87,9 @@ class GN_Submissions {
         $address = isset($_POST['address']) ? sanitize_text_field($_POST['address']) : '';
         $city = isset($_POST['city']) ? sanitize_text_field($_POST['city']) : '';
         $flow_mode = isset($_POST['flow_mode']) ? sanitize_text_field($_POST['flow_mode']) : 'self';
-        $install_mode = isset($_POST['install_mode']) ? sanitize_text_field($_POST['install_mode']) : 'professional';
         $pref_date1 = isset($_POST['pref_date1']) ? sanitize_text_field($_POST['pref_date1']) : '';
         $pref_date2 = isset($_POST['pref_date2']) ? sanitize_text_field($_POST['pref_date2']) : '';
         $pref_date3 = isset($_POST['pref_date3']) ? sanitize_text_field($_POST['pref_date3']) : '';
-        $pref_day1 = isset($_POST['pref_day1']) ? sanitize_text_field($_POST['pref_day1']) : '';
-        $pref_day2 = isset($_POST['pref_day2']) ? sanitize_text_field($_POST['pref_day2']) : '';
-        $pref_day3 = isset($_POST['pref_day3']) ? sanitize_text_field($_POST['pref_day3']) : '';
-        $pref_time1 = isset($_POST['pref_time1']) ? sanitize_text_field($_POST['pref_time1']) : '';
-        $pref_time2 = isset($_POST['pref_time2']) ? sanitize_text_field($_POST['pref_time2']) : '';
-        $pref_time3 = isset($_POST['pref_time3']) ? sanitize_text_field($_POST['pref_time3']) : '';
 
         if (empty($customer_name)) {
             wp_send_json_error(['message' => 'Klant / organisatie naam is verplicht.']);
@@ -111,17 +104,10 @@ class GN_Submissions {
                 $decoded['values']['offerNumber'] = $offer_number;
             }
             $decoded['flowMode'] = $flow_mode;
-            $decoded['installMode'] = $install_mode;
             if ($flow_mode === 'measure') {
                 $decoded['prefDate1'] = $pref_date1;
                 $decoded['prefDate2'] = $pref_date2;
                 $decoded['prefDate3'] = $pref_date3;
-                $decoded['prefDay1'] = $pref_day1;
-                $decoded['prefDay2'] = $pref_day2;
-                $decoded['prefDay3'] = $pref_day3;
-                $decoded['prefTime1'] = $pref_time1;
-                $decoded['prefTime2'] = $pref_time2;
-                $decoded['prefTime3'] = $pref_time3;
             }
             $decoded['submittedAt'] = current_time('mysql');
             $project_json = wp_json_encode($decoded);
@@ -153,17 +139,10 @@ class GN_Submissions {
         update_post_meta($post_id, '_gn_city', $city);
         update_post_meta($post_id, '_gn_status', 'nieuw');
         update_post_meta($post_id, '_gn_flow_mode', $flow_mode);
-        update_post_meta($post_id, '_gn_install_mode', $install_mode);
         if ($flow_mode === 'measure') {
             update_post_meta($post_id, '_gn_pref_date1', $pref_date1);
             update_post_meta($post_id, '_gn_pref_date2', $pref_date2);
             update_post_meta($post_id, '_gn_pref_date3', $pref_date3);
-            update_post_meta($post_id, '_gn_pref_day1', $pref_day1);
-            update_post_meta($post_id, '_gn_pref_day2', $pref_day2);
-            update_post_meta($post_id, '_gn_pref_day3', $pref_day3);
-            update_post_meta($post_id, '_gn_pref_time1', $pref_time1);
-            update_post_meta($post_id, '_gn_pref_time2', $pref_time2);
-            update_post_meta($post_id, '_gn_pref_time3', $pref_time3);
         }
 
         // Sla Snijplan PDF op (vanuit browser als base64 meegestuurd)
@@ -178,34 +157,15 @@ class GN_Submissions {
             update_post_meta($post_id, '_gn_plan_csv_attachment_id', $csv_attachment_id);
         }
 
-        // Sla geüploade foto's op als WordPress attachments
-        $photo_attachment_ids = $this->save_uploaded_photos($post_id, $offer_number);
-        if ($photo_attachment_ids) {
-            update_post_meta($post_id, '_gn_photo_attachment_ids', $photo_attachment_ids);
-        }
-
         GN_Email::send_customer_confirmation($email, $offer_number, $customer_name);
         GN_Email::send_admin_notification($post_id, $offer_number, $customer_name, $email);
 
         $this->dispatch_makecom_webhook($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city);
 
-        // Verzamel bijlagen voor Odoo (PDF + CSV + foto's als URL)
+        // Verzamel bijlagen voor Odoo (PDF + CSV als base64)
         $odoo_attachments = $this->build_odoo_attachments($pdf_attachment_id, $csv_attachment_id, $offer_number);
-        foreach ($photo_attachment_ids as $pid) {
-            $path = get_attached_file($pid);
-            if ($path && file_exists($path)) {
-                $url = wp_get_attachment_url($pid);
-                if ($url) {
-                    $odoo_attachments[] = [
-                        'name'     => basename($path),
-                        'url'      => $url,
-                        'mimetype' => get_post_mime_type($pid) ?: 'image/jpeg',
-                    ];
-                }
-            }
-        }
 
-        $odoo_result = GN_Odoo::instance()->sync_order($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city, $odoo_attachments, $flow_mode, $pref_date1, $pref_date2, $pref_date3, $install_mode, $pref_day1, $pref_day2, $pref_day3, $pref_time1, $pref_time2, $pref_time3);
+        $odoo_result = GN_Odoo::instance()->sync_order($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city, $odoo_attachments, $flow_mode, $pref_date1, $pref_date2, $pref_date3);
         update_post_meta($post_id, '_gn_odoo_order_id', $odoo_result['order_id'] ?? '');
         update_post_meta($post_id, '_gn_odoo_error', $odoo_result['error'] ?? '');
 
@@ -229,10 +189,7 @@ class GN_Submissions {
             'offerNumber'  => $offer_number,
             'submittedAt'  => current_time('mysql'),
             'flowMode'     => $decoded['flowMode'] ?? 'self',
-            'installMode'  => $decoded['installMode'] ?? 'professional',
             'prefDates'    => ($decoded['flowMode'] ?? 'self') === 'measure' ? [$decoded['prefDate1'] ?? '', $decoded['prefDate2'] ?? '', $decoded['prefDate3'] ?? ''] : [],
-            'prefDays'     => ($decoded['flowMode'] ?? 'self') === 'measure' ? [$decoded['prefDay1'] ?? '', $decoded['prefDay2'] ?? '', $decoded['prefDay3'] ?? ''] : [],
-            'prefTimes'    => ($decoded['flowMode'] ?? 'self') === 'measure' ? [$decoded['prefTime1'] ?? '', $decoded['prefTime2'] ?? '', $decoded['prefTime3'] ?? ''] : [],
             'customer' => [
                 'name'        => $customer_name,
                 'contactName' => $contact_name,
@@ -271,9 +228,14 @@ class GN_Submissions {
         $export = $decoded['exportData'] ?? [];
 
         if (($decoded['flowMode'] ?? 'self') === 'measure') {
-            // For measure flow, inmeten cost is included as information in the CRM lead note,
-            // not as a product line. Return empty items.
-            return [];
+            $items[] = [
+                'name'        => 'Laten opmeten',
+                'description' => 'Inmeten op locatie',
+                'quantity'    => 1,
+                'unitPrice'   => floatval(get_option('gn_measure_price', '149')),
+                'productId'   => (int) get_option('gn_odoo_product_measure', 0),
+            ];
+            return $items;
         }
 
         $rollArea = floatval($export['rollArea'] ?? 0);
@@ -325,16 +287,13 @@ class GN_Submissions {
             }
         }
 
-        $install_mode = $decoded['installMode'] ?? ($values['installMode'] ?? 'professional');
-        if (($decoded['flowMode'] ?? 'self') === 'measure' || $install_mode !== 'self') {
-            $items[] = [
-                'name'        => 'Voorrijdkosten',
-                'description' => 'Nader te berekenen',
-                'quantity'    => 1,
-                'unitPrice'   => 0,
-                'productId'   => (int) get_option('gn_odoo_product_voorrijd', 86),
-            ];
-        }
+        $items[] = [
+            'name'        => 'Voorrijdkosten',
+            'description' => 'Nader te berekenen',
+            'quantity'    => 1,
+            'unitPrice'   => 0,
+            'productId'   => (int) get_option('gn_odoo_product_voorrijd', 86),
+        ];
 
         return $items;
     }
@@ -494,28 +453,7 @@ class GN_Submissions {
     }
 
     /**
-     * Slaat geüploade foto's (photo_0, photo_1, photo_2) op als WordPress attachments.
-     */
-    private function save_uploaded_photos($post_id, $offer_number) {
-        $attachment_ids = [];
-        for ($i = 0; $i < 3; $i++) {
-            $key = 'photo_' . $i;
-            if (empty($_FILES[$key]['tmp_name']) || $_FILES[$key]['error'] !== UPLOAD_ERR_OK) continue;
-            $tmp_name = $_FILES[$key]['tmp_name'];
-            $orig_name = $_FILES[$key]['name'];
-            $mime = $_FILES[$key]['type'] ?: 'image/jpeg';
-            $contents = file_get_contents($tmp_name);
-            if ($contents === false || strlen($contents) < 100) continue;
-            $ext = pathinfo($orig_name, PATHINFO_EXTENSION) ?: 'jpg';
-            $filename = sanitize_file_name($offer_number . '_foto_' . ($i + 1) . '.' . $ext);
-            $attach_id = $this->save_binary_attachment($post_id, $filename, $contents, $mime);
-            if ($attach_id) $attachment_ids[] = $attach_id;
-        }
-        return $attachment_ids;
-    }
-
-    /**
-     * Bouwt een array met URL-bijlagen voor Odoo (PDF + CSV).
+     * Bouwt een array met base64-encoded bijlagen voor Odoo (PDF + CSV).
      */
     private function build_odoo_attachments($pdf_attachment_id, $csv_attachment_id, $offer_number) {
         $attachments = [];
@@ -523,36 +461,28 @@ class GN_Submissions {
         if ($pdf_attachment_id) {
             $path = get_attached_file($pdf_attachment_id);
             if ($path && file_exists($path)) {
-                $url = wp_get_attachment_url($pdf_attachment_id);
-                if ($url) {
+                $contents = file_get_contents($path);
+                if ($contents !== false) {
                     $attachments[] = [
                         'name'       => $offer_number . '_snijplan.pdf',
-                        'url'        => $url,
+                        'datas'      => base64_encode($contents),
                         'mimetype'   => 'application/pdf',
                     ];
-                } else {
-                    error_log('GlassNext build_odoo_attachments: PDF has no URL for attachment_id=' . $pdf_attachment_id);
                 }
-            } else {
-                error_log('GlassNext build_odoo_attachments: PDF file not found for attachment_id=' . $pdf_attachment_id);
             }
         }
 
         if ($csv_attachment_id) {
             $path = get_attached_file($csv_attachment_id);
             if ($path && file_exists($path)) {
-                $url = wp_get_attachment_url($csv_attachment_id);
-                if ($url) {
+                $contents = file_get_contents($path);
+                if ($contents !== false) {
                     $attachments[] = [
                         'name'       => $offer_number . '_snijplan.csv',
-                        'url'        => $url,
+                        'datas'      => base64_encode($contents),
                         'mimetype'   => 'text/csv',
                     ];
-                } else {
-                    error_log('GlassNext build_odoo_attachments: CSV has no URL for attachment_id=' . $csv_attachment_id);
                 }
-            } else {
-                error_log('GlassNext build_odoo_attachments: CSV file not found for attachment_id=' . $csv_attachment_id);
             }
         }
 

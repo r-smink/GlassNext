@@ -4,14 +4,14 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
 
 <main class="shell">
 <nav class="tabs no-print">
-  <button class="tab active" data-page="choice">Start</button>
-  <button class="tab hidden" data-page="planner">Ruitmaten</button>
-  <button class="tab hidden" data-page="calc">Calculatie</button>
-  <button class="tab hidden" data-page="roi">ROI-berekening</button>
-  <button class="tab hidden" data-page="project">Project</button>
-  <button class="tab hidden" data-page="offer">Offerte</button>
-  <button class="tab hidden" data-page="workorder">Werkbon</button>
-  <button class="tab hidden" data-page="exports">Export</button>
+  <button class="tab active" data-page="choice">1. Start</button>
+  <button class="tab hidden" data-page="planner">2. Snijplanner</button>
+  <button class="tab hidden" data-page="calc">3. Calculatie</button>
+  <button class="tab hidden" data-page="roi">4. ROI-berekening</button>
+  <button class="tab hidden" data-page="project">5. Project</button>
+  <button class="tab hidden" data-page="offer">6. Offerte</button>
+  <button class="tab hidden" data-page="workorder">7. Werkbon</button>
+  <button class="tab hidden" data-page="exports">8. Export</button>
 </nav>
 
 <section class="page active" id="page-choice">
@@ -31,22 +31,6 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
           <div style="font-size:14px;opacity:.9">U meet zelf de ruiten op en wij maken het snijplan en offerte.</div>
           <div style="font-size:14px;font-weight:700;margin-top:12px">Gratis</div>
         </button>
-      </div>
-      <div id="installChoice" class="hidden" style="margin-top:24px">
-        <h3 style="margin:0 0 10px;font-size:16px">Wilt u de folie zelf aanbrengen of door GlassNext laten aanbrengen?</h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px" class="choice-grid">
-          <button class="btn choice-btn install-choice-btn" id="choiceInstallPro" type="button" style="padding:20px;text-align:left;line-height:1.6">
-            <div style="font-size:16px;font-weight:800;margin-bottom:6px">Folie laten aanbrengen door GlassNext</div>
-            <div style="font-size:13px;opacity:.9">Wij verzorgen de professionele aanbreng van de GlassShield folie.</div>
-          </button>
-          <button class="btn secondary choice-btn install-choice-btn" id="choiceInstallSelf" type="button" style="padding:20px;text-align:left;line-height:1.6">
-            <div style="font-size:16px;font-weight:800;margin-bottom:6px">Folie zelf aanbrengen</div>
-            <div style="font-size:13px;opacity:.9">U brengt de folie zelf aan. Wij leveren het snijplan en voorgesneden materiaal.</div>
-          </button>
-        </div>
-      </div>
-      <div id="choiceContinue" class="hidden" style="margin-top:24px;text-align:right">
-        <button class="btn" id="choiceContinueBtn" type="button" style="min-width:180px">Doorgaan</button>
       </div>
     </div>
   </article>
@@ -74,56 +58,10 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
           <div><label>Voorkeursdatum 2</label><input id="prefDate2" type="date"></div>
           <div><label>Voorkeursdatum 3</label><input id="prefDate3" type="date"></div>
         </div>
-        <div class="fields three" style="margin-top:10px">
-          <div><label>Dagsdeel 1</label><select id="prefDay1"><option value="">Geen voorkeur</option><option value="ochtend">Ochtend</option><option value="middag">Middag</option><option value="avond">Avond</option></select></div>
-          <div><label>Dagsdeel 2</label><select id="prefDay2"><option value="">Geen voorkeur</option><option value="ochtend">Ochtend</option><option value="middag">Middag</option><option value="avond">Avond</option></select></div>
-          <div><label>Dagsdeel 3</label><select id="prefDay3"><option value="">Geen voorkeur</option><option value="ochtend">Ochtend</option><option value="middag">Middag</option><option value="avond">Avond</option></select></div>
-        </div>
-        <div class="fields three" style="margin-top:10px">
-          <div><label>Tijd 1 (optioneel)</label><input id="prefTime1" type="time"></div>
-          <div><label>Tijd 2 (optioneel)</label><input id="prefTime2" type="time"></div>
-          <div><label>Tijd 3 (optioneel)</label><input id="prefTime3" type="time"></div>
-        </div>
         <p class="note" style="margin-top:8px">Wij plannen de inmeting op basis van uw voorkeursdatums. U ontvangt een bevestiging met de definitieve afspraak.</p>
       </div>
       <div style="margin-top:12px"><label>Projectomschrijving / situatie</label><textarea id="projectDescription" placeholder="Bijvoorbeeld: bestaande beglazing voorzien van Nano-EcoLine Climate GlassShield."></textarea></div>
       <div style="margin-top:12px"><label>Bijzonderheden</label><textarea id="projectNotes" placeholder="Bereikbaarheid, planning, glasconditie, werktijden, aandachtspunten..."></textarea></div>
-      <div style="margin-top:16px">
-        <label>Foto's van de ruiten (optioneel, maximaal 3)</label>
-        <div id="photoUploadArea" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
-          <div class="photo-slot" data-slot="0">
-            <input type="file" id="photoFile0" accept="image/*" class="photo-input" style="display:none">
-            <button type="button" class="btn secondary photo-pick-btn" data-slot="0" style="width:120px;height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:2px dashed #94a3b8;background:#f7fafc">
-              <span style="font-size:28px">+</span><span style="font-size:11px">Foto 1</span>
-            </button>
-            <div class="photo-preview" id="photoPreview0" style="display:none;width:120px;height:120px;border-radius:8px;overflow:hidden;position:relative">
-              <img id="photoImg0" style="width:100%;height:100%;object-fit:cover">
-              <button type="button" class="photo-remove-btn" data-slot="0" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:0;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:14px;line-height:1">&times;</button>
-            </div>
-          </div>
-          <div class="photo-slot" data-slot="1">
-            <input type="file" id="photoFile1" accept="image/*" class="photo-input" style="display:none">
-            <button type="button" class="btn secondary photo-pick-btn" data-slot="1" style="width:120px;height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:2px dashed #94a3b8;background:#f7fafc">
-              <span style="font-size:28px">+</span><span style="font-size:11px">Foto 2</span>
-            </button>
-            <div class="photo-preview" id="photoPreview1" style="display:none;width:120px;height:120px;border-radius:8px;overflow:hidden;position:relative">
-              <img id="photoImg1" style="width:100%;height:100%;object-fit:cover">
-              <button type="button" class="photo-remove-btn" data-slot="1" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:0;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:14px;line-height:1">&times;</button>
-            </div>
-          </div>
-          <div class="photo-slot" data-slot="2">
-            <input type="file" id="photoFile2" accept="image/*" class="photo-input" style="display:none">
-            <button type="button" class="btn secondary photo-pick-btn" data-slot="2" style="width:120px;height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:2px dashed #94a3b8;background:#f7fafc">
-              <span style="font-size:28px">+</span><span style="font-size:11px">Foto 3</span>
-            </button>
-            <div class="photo-preview" id="photoPreview2" style="display:none;width:120px;height:120px;border-radius:8px;overflow:hidden;position:relative">
-              <img id="photoImg2" style="width:100%;height:100%;object-fit:cover">
-              <button type="button" class="photo-remove-btn" data-slot="2" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:0;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:14px;line-height:1">&times;</button>
-            </div>
-          </div>
-        </div>
-        <p class="note" style="margin-top:6px">Voeg eventueel foto's toe van de ruiten of situatie. Dit helpt ons bij de beoordeling en planning.</p>
-      </div>
     </div>
   </article>
 
@@ -152,8 +90,21 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
 
 <section class="page" id="page-planner">
 <div class="grid">
-  <article class="card span-12 self-flow-only hidden" id="installModeCard" style="display:none">
-    <input type="hidden" id="installModeValue" value="professional">
+  <article class="card span-12 self-flow-only hidden">
+    <div class="card-head"><h2>Aanbrengen folie</h2></div>
+    <div class="card-body">
+      <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:650">
+          <input type="radio" name="installMode" value="professional" checked style="width:auto">
+          Folie laten aanbrengen door GlassNext
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:650">
+          <input type="radio" name="installMode" value="self" style="width:auto">
+          Folie zelf aanbrengen
+        </label>
+      </div>
+      <p class="note" style="margin-top:10px" id="installModeNote">Bij zelf aanbrengen vervalt het product "Aanbrengen GlassShield per m²" uit de calculatie en offerte.</p>
+    </div>
   </article>
 
   <article class="card span-12">

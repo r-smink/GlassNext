@@ -95,12 +95,6 @@
 #glassnext-app .choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
 #glassnext-app .measure-only{display:none}
 #glassnext-app .measure-only:not(.hidden){display:block}
-#glassnext-app .choice-btn{background:#fff!important;color:var(--blue)!important;border:1.5px solid var(--blue)!important;transition:background .15s,color .15s,border-color .15s!important}
-#glassnext-app .choice-btn:hover{filter:none!important;background:#eef4fb!important}
-#glassnext-app .choice-btn.selected{background:var(--blue)!important;color:#fff!important;border-color:var(--blue)!important}
-#glassnext-app .choice-btn.selected:hover{filter:brightness(1.1)!important;background:var(--blue)!important}
-#glassnext-app .install-choice-btn.selected{outline:3px solid var(--blue2);outline-offset:2px}
-#glassnext-app .install-choice-btn{transition:outline .15s}
 @media(max-width:650px){#glassnext-app .choice-grid{grid-template-columns:1fr}}
 @media(max-width:950px){
   #glassnext-app .span-8,#glassnext-app .span-7,#glassnext-app .span-6,#glassnext-app .span-5,#glassnext-app .span-4{grid-column:span 12}

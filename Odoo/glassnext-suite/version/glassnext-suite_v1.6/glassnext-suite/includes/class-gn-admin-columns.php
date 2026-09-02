@@ -82,9 +82,7 @@ add_action('add_meta_boxes', function() {
         $odoo_error = get_post_meta($post->ID, '_gn_odoo_error', true);
         echo '<tr><th>Odoo</th><td>';
         if ($odoo_order_id) {
-            $flow_mode = get_post_meta($post->ID, '_gn_flow_mode', true) ?: 'self';
-            $label = $flow_mode === 'measure' ? 'CRM Lead' : 'Verkooporder';
-            echo '<span style="color:#087f5b;font-weight:700;">✓ ' . esc_html($label) . ' #' . esc_html($odoo_order_id) . ' aangemaakt</span>';
+            echo '<span style="color:#087f5b;font-weight:700;">✓ Verkooporder #' . esc_html($odoo_order_id) . ' aangemaakt</span>';
         } elseif ($odoo_error) {
             echo '<span style="color:#c0392b;">✗ Mislukt: ' . esc_html($odoo_error) . '</span>';
         } else {
@@ -92,45 +90,6 @@ add_action('add_meta_boxes', function() {
         }
         echo '</td></tr>';
         echo '</table>';
-
-        // Toon flow en install modus
-        $flow_mode = get_post_meta($post->ID, '_gn_flow_mode', true) ?: 'self';
-        $install_mode = get_post_meta($post->ID, '_gn_install_mode', true) ?: 'professional';
-        $flow_label = $flow_mode === 'measure' ? 'Laten opmeten' : 'Zelf opmeten';
-        $install_label = $install_mode === 'self' ? 'Folie zelf aanbrengen' : 'Folie laten aanbrengen';
-        echo '<table class="form-table"><tr><th>Flow</th><td><strong>' . esc_html($flow_label) . '</strong></td></tr>';
-        echo '<tr><th>Aanbrengen</th><td>' . esc_html($install_label) . '</td></tr>';
-
-        // Toen voorkeursdatums met dagsdeel en tijd
-        if ($flow_mode === 'measure') {
-            $days = ['ochtend' => 'Ochtend', 'middag' => 'Middag', 'avond' => 'Avond'];
-            for ($i = 1; $i <= 3; $i++) {
-                $date = get_post_meta($post->ID, "_gn_pref_date{$i}", true);
-                $day = get_post_meta($post->ID, "_gn_pref_day{$i}", true);
-                $time = get_post_meta($post->ID, "_gn_pref_time{$i}", true);
-                if ($date) {
-                    $label = "Voorkeursdatum {$i}";
-                    $val = $date;
-                    if ($day && isset($days[$day])) $val .= ' (' . $days[$day] . ')';
-                    if ($time) $val .= ' om ' . $time;
-                    echo "<tr><th>{$label}</th><td>" . esc_html($val) . "</td></tr>";
-                }
-            }
-        }
-        echo '</table>';
-
-        // Toon foto's
-        $photo_ids = get_post_meta($post->ID, '_gn_photo_attachment_ids', true);
-        if ($photo_ids && is_array($photo_ids) && count($photo_ids) > 0) {
-            echo '<h3 style="margin-top:20px;">Foto\'s</h3><div style="display:flex;gap:12px;flex-wrap:wrap;">';
-            foreach ($photo_ids as $pid) {
-                $url = wp_get_attachment_url($pid);
-                if ($url) {
-                    echo '<a href="' . esc_url($url) . '" target="_blank"><img src="' . esc_url($url) . '" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #dce6ee;"></a>';
-                }
-            }
-            echo '</div>';
-        }
 
         echo '<p style="margin-top:20px;">';
         echo '<a href="' . esc_url(admin_url('admin.php?gn_download_json=1&post_id=' . $post->ID)) . '" class="button button-primary">';

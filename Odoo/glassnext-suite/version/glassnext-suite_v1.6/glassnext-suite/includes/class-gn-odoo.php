@@ -339,13 +339,13 @@ class GN_Odoo {
      *
      * @return array{success:bool, order_id:?int, partner_id:?int, error:?string}
      */
-    public function sync_order($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city, $attachments = [], $flow_mode = 'self', $pref_date1 = '', $pref_date2 = '', $pref_date3 = '', $install_mode = 'professional', $pref_day1 = '', $pref_day2 = '', $pref_day3 = '', $pref_time1 = '', $pref_time2 = '', $pref_time3 = '') {
+    public function sync_order($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city, $attachments = [], $flow_mode = 'self', $pref_date1 = '', $pref_date2 = '', $pref_date3 = '') {
         if (!$this->is_enabled()) {
             return ['success' => false, 'order_id' => null, 'partner_id' => null, 'error' => 'Odoo-integratie niet geconfigureerd of uitgeschakeld.'];
         }
 
         try {
-            $this->debug_log('sync_order start: offer=' . $offer_number . ' customer=' . $customer_name . ' contact=' . $contact_name . ' email=' . $email . ' flow=' . $flow_mode . ' install=' . $install_mode);
+            $this->debug_log('sync_order start: offer=' . $offer_number . ' customer=' . $customer_name . ' contact=' . $contact_name . ' email=' . $email);
 
             $this->authenticate();
             $this->debug_log('authenticate ok, uid=' . $this->uid);
@@ -353,74 +353,39 @@ class GN_Odoo {
             $partner_id = $this->find_or_create_partner($email, $contact_name ?: $customer_name, $phone, $address, $city);
             $this->debug_log('partner_id=' . $partner_id);
 
+            $order_id = $this->create_sale_order($partner_id, $offer_number);
+            $this->debug_log('order_id=' . $order_id);
+
+            $export = $decoded['exportData'] ?? [];
+            $roll_area   = floatval($export['rollArea'] ?? 0);
+            $roll_length = floatval($export['rollLength'] ?? 0);
+            $pieces      = intval($export['pieces'] ?? 0);
+
+            $product_material = (int) get_option('gn_odoo_product_material', 3);
+            $product_mount    = (int) get_option('gn_odoo_product_mount', 5);
+            $product_cut      = (int) get_option('gn_odoo_product_cut', 85);
+
+            $install_mode = $decoded['values']['installMode'] ?? 'professional';
+
             if ($flow_mode === 'measure') {
-                // Build notes for lead
-                $form_note = '';
-                $form_note_html = '';
-                try {
-                    $form_note = $this->build_form_note($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city, $flow_mode, $install_mode, $pref_date1, $pref_date2, $pref_date3, $pref_day1, $pref_day2, $pref_day3, $pref_time1, $pref_time2, $pref_time3, $attachments);
-                } catch (Exception $ne) {
-                    $this->debug_log('build_form_note error (non-fatal): ' . $ne->getMessage());
+                $product_measure = (int) get_option('gn_odoo_product_measure', 0);
+                if ($product_measure > 0) {
+                    $this->add_fixed_line($order_id, $product_measure, 1);
                 }
-                try {
-                    $form_note_html = $this->build_form_note_html($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city, $flow_mode, $install_mode, $pref_date1, $pref_date2, $pref_date3, $pref_day1, $pref_day2, $pref_day3, $pref_time1, $pref_time2, $pref_time3, $attachments);
-                } catch (Exception $ne) {
-                    $this->debug_log('build_form_note_html error (non-fatal): ' . $ne->getMessage());
-                }
+                $date_note = "Voorkeursdatums inmeten:\n";
+                $date_note .= "1: " . $pref_date1 . "\n";
+                $date_note .= "2: " . $pref_date2 . "\n";
+                $date_note .= "3: " . $pref_date3;
+                $this->call('sale.order', 'write', [[$order_id], ['note' => $date_note]]);
 
-                // Create crm.lead instead of sale.order for "Laten opmeten" flow
-                $lead_id = $this->create_crm_lead($partner_id, $offer_number, $customer_name, '', $pref_date1, $pref_day1, $pref_time1);
-                $this->debug_log('lead_id=' . $lead_id);
-
-                // Add 'website' tag to the lead
-                $this->add_website_tag('crm.lead', $lead_id);
-
-                // Upload attachments to the lead
-                $this->debug_log('measure flow: attachments count=' . count($attachments) . ' form_note_html empty=' . (empty($form_note_html) ? 'yes' : 'no'));
-                if (!empty($attachments)) {
-                    $uploaded_count = 0;
-                    foreach ($attachments as $att) {
-                        $this->debug_log('measure flow: uploading attachment: ' . $att['name'] . ' mimetype=' . $att['mimetype'] . ' url=' . ($att['url'] ?? ''));
-                        $result = $this->upload_attachment_to_model('crm.lead', $lead_id, $att['name'], $att['url'], $att['mimetype']);
-                        if ($result) {
-                            $uploaded_count++;
-                        }
-                    }
-                    $this->debug_log('uploaded ' . $uploaded_count . '/' . count($attachments) . ' attachment(s) to crm.lead ' . $lead_id);
-                }
-
-                // Create calendar event if enabled
                 if (get_option('gn_odoo_create_calendar_event', '') === '1' && $pref_date1) {
                     try {
-                        $this->create_calendar_event($partner_id, $offer_number, $pref_date1, $customer_name, $pref_time1);
+                        $this->create_calendar_event($partner_id, $offer_number, $pref_date1, $customer_name);
                     } catch (Exception $ce) {
                         $this->debug_log('calendar event error: ' . $ce->getMessage());
                     }
                 }
-
-                // Post form data as HTML table message in the chatter
-                if ($form_note_html) {
-                    $this->post_message_to_chatter('crm.lead', $lead_id, $form_note_html);
-                }
-
-                $this->debug_log('sync_order complete (lead): lead_id=' . $lead_id . ' partner_id=' . $partner_id);
-                return ['success' => true, 'order_id' => $lead_id, 'partner_id' => $partner_id, 'error' => null];
-
             } else {
-                // Create sale.order for "Zelf opmeten" flow
-                $order_id = $this->create_sale_order($partner_id, $offer_number);
-                $this->debug_log('order_id=' . $order_id);
-
-                // Add 'website' tag to the order
-                $this->add_website_tag('sale.order', $order_id);
-
-                $export = $decoded['exportData'] ?? [];
-                $roll_area   = floatval($export['rollArea'] ?? 0);
-                $roll_length = floatval($export['rollLength'] ?? 0);
-                $pieces      = intval($export['pieces'] ?? 0);
-                $this->debug_log('exportData raw: ' . json_encode($export));
-                $this->debug_log('roll_area=' . $roll_area . ' roll_length=' . $roll_length . ' pieces=' . $pieces . ' install_mode=' . $install_mode);
-
                 $product_material = (int) get_option('gn_odoo_product_material', 3);
                 $product_mount    = (int) get_option('gn_odoo_product_mount', 5);
                 $product_cut      = (int) get_option('gn_odoo_product_cut', 85);
@@ -428,7 +393,6 @@ class GN_Odoo {
                 if ($roll_area > 0) {
                     $this->add_fixed_line($order_id, $product_material, $roll_area);
                 }
-                // Montage: add with calculated rate in Odoo (even though offer shows "nader te berekenen")
                 if ($roll_length > 0 && $install_mode !== 'self') {
                     $this->add_fixed_line($order_id, $product_mount, $roll_length);
                 }
@@ -445,376 +409,25 @@ class GN_Odoo {
                 }
 
                 $product_voorrijd = (int) get_option('gn_odoo_product_voorrijd', 86);
-                if ($product_voorrijd > 0 && $install_mode !== 'self') {
+                if ($product_voorrijd > 0) {
                     $this->add_fixed_line($order_id, $product_voorrijd, 1);
                 }
-
-                // Build notes after order lines so note errors don't block line creation
-                $form_note = '';
-                $form_note_html = '';
-                try {
-                    $form_note = $this->build_form_note($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city, $flow_mode, $install_mode, $pref_date1, $pref_date2, $pref_date3, $pref_day1, $pref_day2, $pref_day3, $pref_time1, $pref_time2, $pref_time3, $attachments);
-                } catch (Exception $ne) {
-                    $this->debug_log('build_form_note error (non-fatal): ' . $ne->getMessage());
-                }
-                try {
-                    $form_note_html = $this->build_form_note_html($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city, $flow_mode, $install_mode, $pref_date1, $pref_date2, $pref_date3, $pref_day1, $pref_day2, $pref_day3, $pref_time1, $pref_time2, $pref_time3, $attachments);
-                } catch (Exception $ne) {
-                    $this->debug_log('build_form_note_html error (non-fatal): ' . $ne->getMessage());
-                }
-
-                // Write the comprehensive form note (empty, HTML is in chatter)
-                if ($form_note) {
-                    try { $this->call('sale.order', 'write', [[$order_id], ['note' => '']]); } catch (Exception $e) { $this->debug_log('write note error: ' . $e->getMessage()); }
-                }
-
-                // Post form data as HTML table message in the chatter
-                if ($form_note_html) {
-                    $this->post_message_to_chatter('sale.order', $order_id, $form_note_html);
-                }
-
-                // Upload attachments to sale.order
-                if (!empty($attachments)) {
-                    $uploaded_count = 0;
-                    foreach ($attachments as $att) {
-                        $result = $this->upload_attachment_to_model('sale.order', $order_id, $att['name'], $att['url'], $att['mimetype']);
-                        if ($result) {
-                            $uploaded_count++;
-                        }
-                    }
-                    $this->debug_log('uploaded ' . $uploaded_count . '/' . count($attachments) . ' attachment(s) to sale.order ' . $order_id);
-                }
-
-                $this->debug_log('sync_order complete (order): order_id=' . $order_id . ' partner_id=' . $partner_id);
-                return ['success' => true, 'order_id' => $order_id, 'partner_id' => $partner_id, 'error' => null];
             }
+
+            // Upload bijlagen (Snijplan PDF + CSV) naar Odoo sale.order
+            if (!empty($attachments)) {
+                foreach ($attachments as $att) {
+                    $this->upload_attachment($order_id, $att['name'], $att['datas'], $att['mimetype']);
+                }
+                $this->debug_log('uploaded ' . count($attachments) . ' attachment(s) to sale.order ' . $order_id);
+            }
+
+            $this->debug_log('sync_order complete: order_id=' . $order_id . ' partner_id=' . $partner_id);
+            return ['success' => true, 'order_id' => $order_id, 'partner_id' => $partner_id, 'error' => null];
 
         } catch (Exception $e) {
             $this->debug_log('sync_order error: ' . $e->getMessage());
             return ['success' => false, 'order_id' => null, 'partner_id' => null, 'error' => $e->getMessage()];
-        }
-    }
-
-    /**
-     * Build a comprehensive note with all form fields for Odoo (Task 7).
-     */
-    private function build_form_note($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city, $flow_mode, $install_mode, $pref_date1, $pref_date2, $pref_date3, $pref_day1, $pref_day2, $pref_day3, $pref_time1, $pref_time2, $pref_time3, $attachments = []) {
-        $values = $decoded['values'] ?? [];
-        $export = $decoded['exportData'] ?? [];
-        $panes = $decoded['panes'] ?? [];
-        $other_costs = $decoded['otherCosts'] ?? [];
-
-        $flow_label = $flow_mode === 'measure' ? 'Laten opmeten' : 'Zelf opmeten';
-        $install_label = $install_mode === 'self' ? 'Folie zelf aanbrengen' : 'Folie laten aanbrengen door GlassNext';
-
-        $days = ['ochtend' => 'Ochtend', 'middag' => 'Middag', 'avond' => 'Avond'];
-
-        $note = "=== GlassNext Website Aanvraag ===\n";
-        $note .= "Offertenummer: " . $offer_number . "\n";
-        $note .= "Flow: " . $flow_label . "\n";
-        $note .= "Aanbrengen: " . $install_label . "\n";
-        $note .= "Ingediend op: " . current_time('mysql') . "\n\n";
-
-        $note .= "--- Klantgegevens ---\n";
-        $note .= "Klant / organisatie: " . $customer_name . "\n";
-        $note .= "Contactpersoon: " . $contact_name . "\n";
-        $note .= "E-mail: " . $email . "\n";
-        $note .= "Telefoon: " . $phone . "\n";
-        $note .= "Adres: " . $address . "\n";
-        $note .= "Postcode / plaats: " . $city . "\n\n";
-
-        $note .= "--- Project ---\n";
-        $note .= "Projectomschrijving: " . ($values['projectDescription'] ?? '') . "\n";
-        $note .= "Bijzonderheden: " . ($values['projectNotes'] ?? '') . "\n\n";
-
-        if ($flow_mode === 'measure') {
-            $measure_price = get_option('gn_measure_price', '149');
-            $note .= "--- Inmeten kosten ---\n";
-            $note .= "Inmeten op locatie: € " . $measure_price . ",-\n\n";
-        }
-
-        if ($flow_mode === 'measure') {
-            $note .= "--- Voorkeursdatums inmeten ---\n";
-            for ($i = 1; $i <= 3; $i++) {
-                $date_var = "pref_date{$i}";
-                $day_var = "pref_day{$i}";
-                $time_var = "pref_time{$i}";
-                $date_val = $$date_var;
-                $day_val = $$day_var;
-                $time_val = $$time_var;
-                if ($date_val) {
-                    $line = "Datum {$i}: {$date_val}";
-                    if ($day_val && isset($days[$day_val])) $line .= " (" . $days[$day_val] . ")";
-                    if ($time_val) $line .= " om {$time_val}";
-                    $note .= $line . "\n";
-                }
-            }
-            $note .= "\n";
-        }
-
-        if ($flow_mode !== 'measure' && !empty($panes)) {
-            $note .= "--- Ruiten ---\n";
-            foreach ($panes as $pane) {
-                $note .= sprintf("  %s: %s x %s cm, %s stuks, rotatie=%s, ruimte=%s\n",
-                    $pane['id'] ?? '', $pane['w'] ?? '', $pane['h'] ?? '',
-                    $pane['n'] ?? '1', $pane['rot'] ?? '1', $pane['room'] ?? '');
-            }
-            $note .= "\n";
-        }
-
-        if ($flow_mode !== 'measure' && !empty($export)) {
-            $note .= "--- Snijplan data ---\n";
-            $note .= "Aantal stukken: " . ($export['pieces'] ?? 0) . "\n";
-            $note .= "Rollengte: " . ($export['rollLength'] ?? 0) . " m\n";
-            $note .= "Rolverbruik: " . ($export['rollArea'] ?? 0) . " m²\n\n";
-        }
-
-        if ($flow_mode !== 'measure' && !empty($other_costs)) {
-            $note .= "--- Overige kosten ---\n";
-            foreach ($other_costs as $cost) {
-                if (!empty($cost['description']) || floatval($cost['amount'] ?? 0) > 0) {
-                    $note .= "  " . ($cost['description'] ?? 'Onbekend') . ": € " . ($cost['amount'] ?? 0) . "\n";
-                }
-            }
-            $note .= "\n";
-        }
-
-        $note .= "--- Montage instellingen ---\n";
-        $note .= "Montageklasse: " . ($values['mountClass'] ?? 'average') . "\n";
-        $note .= "Montagetarief: € " . ($values['mountSelectedPrice'] ?? 0) . "/m²\n";
-        $note .= "Montage berekenen over: " . ($values['mountAreaBasis'] ?? 'net') . "\n";
-
-        return $note;
-    }
-
-    /**
-     * Build an HTML table version of the form data for Odoo chatter message.
-     */
-    private function build_form_note_html($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city, $flow_mode, $install_mode, $pref_date1, $pref_date2, $pref_date3, $pref_day1, $pref_day2, $pref_day3, $pref_time1, $pref_time2, $pref_time3, $attachments = []) {
-        $values = $decoded['values'] ?? [];
-        $export = $decoded['exportData'] ?? [];
-        $panes = $decoded['panes'] ?? [];
-        $other_costs = $decoded['otherCosts'] ?? [];
-
-        $flow_label = $flow_mode === 'measure' ? 'Laten opmeten' : 'Zelf opmeten';
-        $install_label = $install_mode === 'self' ? 'Folie zelf aanbrengen' : 'Folie laten aanbrengen door GlassNext';
-        $days = ['ochtend' => 'Ochtend', 'middag' => 'Middag', 'avond' => 'Avond'];
-
-        $esc = function($v) { return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); };
-
-        $rows = function($label, $value) use ($esc) {
-            return '<tr><td style="padding:4px 12px 4px 0;font-weight:600;vertical-align:top;color:#4a5568;">' . $esc($label) . '</td><td style="padding:4px 0;">' . $esc($value) . '</td></tr>';
-        };
-
-        $h = '<div style="font-family:Arial,sans-serif;font-size:13px;">';
-        $h .= '<h3 style="margin:0 0 10px;color:#2c3e50;">GlassNext Website Aanvraag — ' . $esc($offer_number) . '</h3>';
-        $h .= '<p style="margin:0 0 12px;color:#718096;font-size:12px;">Ingediend op ' . $esc(current_time('mysql')) . '</p>';
-
-        // Algemeen
-        $h .= '<table style="border-collapse:collapse;margin-bottom:14px;">';
-        $h .= $rows('Flow', $flow_label);
-        $h .= $rows('Aanbrengen', $install_label);
-        $h .= '</table>';
-
-        // Klantgegevens
-        $h .= '<h4 style="margin:0 0 6px;color:#2c3e50;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Klantgegevens</h4>';
-        $h .= '<table style="border-collapse:collapse;margin-bottom:14px;">';
-        $h .= $rows('Klant / organisatie', $customer_name);
-        $h .= $rows('Contactpersoon', $contact_name);
-        $h .= $rows('E-mail', $email);
-        $h .= $rows('Telefoon', $phone);
-        $h .= $rows('Adres', $address);
-        $h .= $rows('Postcode / plaats', $city);
-        $h .= '</table>';
-
-        // Project
-        $h .= '<h4 style="margin:0 0 6px;color:#2c3e50;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Project</h4>';
-        $h .= '<table style="border-collapse:collapse;margin-bottom:14px;">';
-        $h .= $rows('Projectomschrijving', $values['projectDescription'] ?? '');
-        $h .= $rows('Bijzonderheden', $values['projectNotes'] ?? '');
-        $h .= '</table>';
-
-        // Inmeten kosten (measure flow)
-        if ($flow_mode === 'measure') {
-            $measure_price = get_option('gn_measure_price', '149');
-            $h .= '<h4 style="margin:0 0 6px;color:#2c3e50;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Inmeten kosten</h4>';
-            $h .= '<table style="border-collapse:collapse;margin-bottom:14px;">';
-            $h .= $rows('Inmeten op locatie', '€ ' . $measure_price . ',-');
-            $h .= '</table>';
-        }
-
-        // Voorkeursdatums (measure flow)
-        if ($flow_mode === 'measure') {
-            $h .= '<h4 style="margin:0 0 6px;color:#2c3e50;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Voorkeursdatums inmeten</h4>';
-            $h .= '<table style="border-collapse:collapse;margin-bottom:14px;">';
-            for ($i = 1; $i <= 3; $i++) {
-                $date_var = "pref_date{$i}"; $day_var = "pref_day{$i}"; $time_var = "pref_time{$i}";
-                $date_val = $$date_var; $day_val = $$day_var; $time_val = $$time_var;
-                if ($date_val) {
-                    $line = $date_val;
-                    if ($day_val && isset($days[$day_val])) $line .= ' (' . $days[$day_val] . ')';
-                    if ($time_val) $line .= ' om ' . $time_val;
-                    $h .= $rows('Voorkeur ' . $i, $line);
-                }
-            }
-            $h .= '</table>';
-        }
-
-        // Ruiten (self flow)
-        if ($flow_mode !== 'measure' && !empty($panes)) {
-            $h .= '<h4 style="margin:0 0 6px;color:#2c3e50;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Ruiten</h4>';
-            $h .= '<table style="border-collapse:collapse;margin-bottom:14px;width:100%;">';
-            $h .= '<thead><tr style="background:#f7fafc;text-align:left;"><th style="padding:4px 8px;">Kenmerk</th><th style="padding:4px 8px;">B x H (cm)</th><th style="padding:4px 8px;">Aantal</th><th style="padding:4px 8px;">Rotatie</th><th style="padding:4px 8px;">Ruimte</th></tr></thead><tbody>';
-            foreach ($panes as $pane) {
-                $h .= '<tr><td style="padding:3px 8px;">' . $esc($pane['id'] ?? '') . '</td><td style="padding:3px 8px;">' . $esc($pane['w'] ?? '') . ' x ' . $esc($pane['h'] ?? '') . '</td><td style="padding:3px 8px;">' . $esc($pane['n'] ?? '1') . '</td><td style="padding:3px 8px;">' . (($pane['rot'] ?? '1') === '1' ? 'Ja' : 'Nee') . '</td><td style="padding:3px 8px;">' . $esc($pane['room'] ?? '') . '</td></tr>';
-            }
-            $h .= '</tbody></table>';
-        }
-
-        // Snijplan data (self flow)
-        if ($flow_mode !== 'measure' && !empty($export)) {
-            $h .= '<h4 style="margin:0 0 6px;color:#2c3e50;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Snijplan data</h4>';
-            $h .= '<table style="border-collapse:collapse;margin-bottom:14px;">';
-            $h .= $rows('Aantal stukken', $export['pieces'] ?? 0);
-            $h .= $rows('Rollengte', ($export['rollLength'] ?? 0) . ' m');
-            $h .= $rows('Rolverbruik', ($export['rollArea'] ?? 0) . ' m²');
-            $h .= '</table>';
-        }
-
-        // Overige kosten (self flow)
-        if ($flow_mode !== 'measure' && !empty($other_costs)) {
-            $has_costs = false;
-            foreach ($other_costs as $cost) {
-                if (!empty($cost['description']) || floatval($cost['amount'] ?? 0) > 0) { $has_costs = true; break; }
-            }
-            if ($has_costs) {
-                $h .= '<h4 style="margin:0 0 6px;color:#2c3e50;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Overige kosten</h4>';
-                $h .= '<table style="border-collapse:collapse;margin-bottom:14px;">';
-                foreach ($other_costs as $cost) {
-                    if (!empty($cost['description']) || floatval($cost['amount'] ?? 0) > 0) {
-                        $h .= $rows($cost['description'] ?? 'Onbekend', '€ ' . ($cost['amount'] ?? 0));
-                    }
-                }
-                $h .= '</table>';
-            }
-        }
-
-        // Montage instellingen
-        $h .= '<h4 style="margin:0 0 6px;color:#2c3e50;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Montage instellingen</h4>';
-        $h .= '<table style="border-collapse:collapse;margin-bottom:14px;">';
-        $h .= $rows('Montageklasse', $values['mountClass'] ?? 'average');
-        $h .= $rows('Montagetarief', '€ ' . ($values['mountSelectedPrice'] ?? 0) . '/m²');
-        $h .= $rows('Montage berekenen over', $values['mountAreaBasis'] ?? 'net');
-        $h .= '</table>';
-
-        $h .= '</div>';
-        return $h;
-    }
-
-    /**
-     * Post a message to the Odoo chatter of a record.
-     */
-    private function post_message_to_chatter($model, $res_id, $body) {
-        $this->debug_log('post_message_to_chatter: model=' . $model . ' res_id=' . $res_id);
-        try {
-            $result = $this->call($model, 'message_post', [[$res_id]], [
-                'body' => $body,
-                'message_type' => 'comment',
-                'subtype_xmlid' => 'mail.mt_note',
-                'body_is_html' => true,
-            ]);
-            $this->debug_log('post_message_to_chatter: result=' . var_export($result, true));
-        } catch (Exception $e) {
-            $this->debug_log('post_message_to_chatter error: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Create a CRM lead in Odoo for "Laten opmeten" flow (Task 5).
-     */
-    private function create_crm_lead($partner_id, $offer_number, $customer_name, $note, $pref_date1 = '', $pref_day1 = '', $pref_time1 = '') {
-        $lead_data = [
-            'name'        => 'Inmeten ' . $customer_name . ' (' . $offer_number . ')',
-            'partner_id'  => $partner_id,
-            'description' => $note,
-            'type'        => 'opportunity',
-            'stage_id'    => 12,
-        ];
-
-        // Set the expected closing date if a preference date is given
-        if ($pref_date1) {
-            $lead_data['date_deadline'] = $pref_date1;
-        }
-
-        $lead_id = $this->call('crm.lead', 'create', [$lead_data]);
-        if (!$lead_id) {
-            throw new Exception('crm.lead create retourneerde geen geldig ID: ' . var_export($lead_id, true));
-        }
-        return (int) $lead_id;
-    }
-
-    /**
-     * Add a 'website' tag to a record (Task 4).
-     */
-    private function add_website_tag($model, $res_id) {
-        try {
-            // Find or create the 'website' tag
-            $tag_id = null;
-            $found = $this->call('crm.tag', 'search', [
-                [['name', '=', 'website']],
-            ]);
-            if (!empty($found) && isset($found[0])) {
-                $tag_id = (int) $found[0];
-            } else {
-                $tag_id = $this->call('crm.tag', 'create', [['name' => 'website']]);
-                if ($tag_id) $tag_id = (int) $tag_id;
-            }
-
-            if (!$tag_id) {
-                $this->debug_log('add_website_tag: could not find or create tag');
-                return;
-            }
-
-            // Add tag to the record
-            if ($model === 'crm.lead') {
-                $this->call('crm.lead', 'write', [[$res_id], ['tag_ids' => [[6, 0, [$tag_id]]]]]);
-            } elseif ($model === 'sale.order') {
-                // sale.order may not have tag_ids directly; try writing it
-                try {
-                    $this->call('sale.order', 'write', [[$res_id], ['tag_ids' => [[6, 0, [$tag_id]]]]]);
-                } catch (Exception $e) {
-                    $this->debug_log('add_website_tag: sale.order tag write failed: ' . $e->getMessage());
-                }
-            }
-            $this->debug_log('add_website_tag: tag ' . $tag_id . ' added to ' . $model . ' ' . $res_id);
-        } catch (Exception $e) {
-            $this->debug_log('add_website_tag error (non-fatal): ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Upload an attachment to any Odoo model.
-     */
-    private function upload_attachment_to_model($model, $res_id, $name, $url, $mimetype) {
-        if (empty($url)) {
-            $this->debug_log('upload_attachment_to_model: SKIPPED empty url for ' . $name);
-            return null;
-        }
-        $this->debug_log('upload_attachment_to_model: model=' . $model . ' res_id=' . $res_id . ' name=' . $name . ' mimetype=' . $mimetype . ' url=' . $url);
-        try {
-            $result = $this->call('ir.attachment', 'create', [[
-                'name'      => $name,
-                'url'       => $url,
-                'res_model' => $model,
-                'res_id'    => $res_id,
-                'mimetype'  => $mimetype,
-                'type'      => 'url',
-            ]]);
-            $this->debug_log('upload_attachment_to_model result: ' . var_export($result, true));
-            return $result;
-        } catch (Exception $e) {
-            $this->debug_log('upload_attachment_to_model error: ' . $e->getMessage());
-            return null;
         }
     }
 
@@ -836,11 +449,10 @@ class GN_Odoo {
     /**
      * Maak een concept agenda-afspraak in Odoo voor het inmeten.
      */
-    private function create_calendar_event($partner_id, $offer_number, $date, $customer_name, $pref_time = '') {
-        $this->debug_log('create_calendar_event: partner=' . $partner_id . ' date=' . $date . ' time=' . $pref_time . ' offer=' . $offer_number);
-        $start_time = $pref_time ? substr($pref_time, 0, 5) . ':00' : '09:00:00';
-        $start = $date . ' ' . $start_time;
-        $stop = $date . ' ' . date('H:i:s', strtotime($start_time . ' +1 hour'));
+    private function create_calendar_event($partner_id, $offer_number, $date, $customer_name) {
+        $this->debug_log('create_calendar_event: partner=' . $partner_id . ' date=' . $date . ' offer=' . $offer_number);
+        $start = $date . ' 09:00:00';
+        $stop = $date . ' 10:00:00';
         $this->call('calendar.event', 'create', [[
             'name'      => 'Inmeten ' . $customer_name . ' (' . $offer_number . ')',
             'partner_ids' => [[$partner_id]],
