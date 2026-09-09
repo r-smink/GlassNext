@@ -246,8 +246,10 @@ $("#demoPanes").onclick=()=>{paneBody.innerHTML="";[
 ].forEach(addPaneRow)};
 addPaneRow();
 
-function readItems(){
-  const margin=Math.max(0,num($("#marginSide").value)||0),items=[],errors=[];
+function readItems(rollW=null){
+  const margin=Math.max(0,num($("#marginSide").value)||0),items=[],errors=[],splitNotices=[];
+  const fitsRoll=(w,h,canRotate)=>rollW==null||w<=rollW+EPS||(canRotate&&h<=rollW+EPS);
+
   $$("#paneTable tbody tr").forEach((tr,row)=>{
     const id=tr.querySelector(".pid").value.trim()||`R${row+1}`;
     const netW=(num(tr.querySelector(".pw").value)||0)*10;
@@ -256,10 +258,69 @@ function readItems(){
     const canRotate=tr.querySelector(".prot").value==="1";
     const room=tr.querySelector(".proom").value.trim();
     if(netW<=0||netH<=0){errors.push(`${id}: voer geldige breedte en hoogte in.`);return}
-    for(let i=1;i<=count;i++)items.push({baseId:id,copy:i,label:count>1?`${id}-${i}`:id,room,netW,netH,w:netW+2*margin,h:netH+2*margin,canRotate,margin});
+
+    const fullW=netW+2*margin,fullH=netH+2*margin;
+
+    if(fitsRoll(fullW,fullH,canRotate)){
+      for(let i=1;i<=count;i++){
+        items.push({baseId:id,copy:i,label:count>1?`${id}-${i}`:id,room,netW,netH,w:fullW,h:fullH,canRotate,margin,split:false});
+      }
+      return;
+    }
+
+    // De volledige ruit past niet op de rol. Probeer twee gelijke delen.
+    // Elk deel krijgt op de drie buitenzijden de normale snijrand.
+    // Op de naadzijde wordt géén extra snijrand toegevoegd.
+    const alternatives=[
+      {
+        axis:"width",
+        partNetW:netW/2, partNetH:netH,
+        grossW:netW/2+margin, grossH:netH+2*margin,
+        seamA:"rechts", seamB:"links"
+      },
+      {
+        axis:"height",
+        partNetW:netW, partNetH:netH/2,
+        grossW:netW+2*margin, grossH:netH/2+margin,
+        seamA:"onder", seamB:"boven"
+      }
+    ].filter(a=>fitsRoll(a.grossW,a.grossH,canRotate));
+
+    if(!alternatives.length){
+      errors.push(`${id}: past niet uit één stuk en ook niet als twee gelijke delen op de rol.`);
+      return;
+    }
+
+    // Kies, indien beide varianten passen, de variant met de kortste benodigde
+    // lengterichting. Dit geeft in de praktijk de meest logische tweedeling.
+    alternatives.sort((a,b)=>{
+      const lenA=canRotate?Math.max(a.grossW,a.grossH):a.grossH;
+      const lenB=canRotate?Math.max(b.grossW,b.grossH):b.grossH;
+      return lenA-lenB;
+    });
+    const split=alternatives[0];
+
+    splitNotices.push(`${id}: ${count} ${count===1?"raam":"ramen"} automatisch verdeeld in Deel A en Deel B; de naadzijde heeft geen extra snijrand.`);
+
+    for(let i=1;i<=count;i++){
+      const paneLabel=count>1?`${id}-${i}`:id;
+      items.push({
+        baseId:id,copy:i,label:`${paneLabel} - Deel A`,room,
+        netW:split.partNetW,netH:split.partNetH,w:split.grossW,h:split.grossH,
+        canRotate,margin,split:true,splitPart:"A",splitAxis:split.axis,seamSide:split.seamA,
+        originalNetW:netW,originalNetH:netH
+      });
+      items.push({
+        baseId:id,copy:i,label:`${paneLabel} - Deel B`,room,
+        netW:split.partNetW,netH:split.partNetH,w:split.grossW,h:split.grossH,
+        canRotate,margin,split:true,splitPart:"B",splitAxis:split.axis,seamSide:split.seamB,
+        originalNetW:netW,originalNetH:netH
+      });
+    }
   });
-  if(!items.length)errors.push("Voer minimaal één geldige ruit in.");
-  return{items,errors};
+
+  if(!items.length&&!errors.length)errors.push("Voer minimaal één geldige ruit in.");
+  return{items,errors,splitNotices};
 }
 function intersects(a,b,g){return !(a.x+a.w+g<=b.x+EPS||b.x+b.w+g<=a.x+EPS||a.y+a.h+g<=b.y+EPS||b.y+b.h+g<=a.y+EPS)}
 function candidates(placed,rollW,g){
@@ -318,19 +379,33 @@ function planStats(res,rollW,rollL){
   return{netArea:net/1e6,grossArea:gross/1e6,rollArea:roll/1e6,wasteArea:waste/1e6,eff:roll?gross/roll*100:0,loss:roll?waste/roll*100:0,remaining:(rollL-res.totalLen)/1000};
 }
 function drawPlan(res,rollW){
-  const c=$("#planCanvas"),ctx=c.getContext("2d"),pxW=1000,scale=pxW/rollW,h=Math.max(450,Math.ceil(res.totalLen*scale)+30);
-  c.width=pxW;c.height=h;ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);ctx.strokeStyle="#102535";ctx.lineWidth=2;ctx.strokeRect(1,1,rollW*scale-2,res.totalLen*scale-2);
+  const c=$("#planCanvas"),ctx=c.getContext("2d");
+  const preferredW=1000,maxCanvasH=28000;
+  // Bij lange snijplannen kon het canvas hoger worden dan de browser technisch
+  // kan weergeven. De PDF/CSV bleven dan wel werken, maar het scherm bleef leeg.
+  // Daarom schalen we uitsluitend de schermweergave zo nodig iets terug.
+  const scaleByWidth=preferredW/rollW;
+  const scaleByHeight=(maxCanvasH-30)/Math.max(res.totalLen,1);
+  const scale=Math.min(scaleByWidth,scaleByHeight);
+  const canvasW=Math.max(1,Math.ceil(rollW*scale));
+  const canvasH=Math.max(450,Math.ceil(res.totalLen*scale)+30);
+
+  c.width=canvasW;c.height=canvasH;
+  ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);
+  ctx.strokeStyle="#102535";ctx.lineWidth=2;
+  ctx.strokeRect(1,1,rollW*scale-2,res.totalLen*scale-2);
   ctx.font="12px Segoe UI";ctx.textBaseline="top";
   res.placed.forEach(p=>{const x=p.x*scale,y=p.y*scale,w=p.w*scale,h=p.h*scale;ctx.fillStyle=colorFor(p.item.baseId);ctx.fillRect(x,y,w,h);ctx.strokeStyle="#344d60";ctx.lineWidth=1;ctx.strokeRect(x,y,w,h);ctx.fillStyle="#102535";if(w>42&&h>17)ctx.fillText(`${p.item.label}${p.rotated?" ↻":""}`,x+4,y+4);if(w>90&&h>35)ctx.fillText(`${Math.round(p.w)}×${Math.round(p.h)} mm`,x+4,y+20)});
 }
-function renderPlan(res,rollW,rollL,kerf){
+function renderPlan(res,rollW,rollL,kerf,splitNotices=[]){
   const stats=planStats(res,rollW,rollL),errors=[];
   res.placed.forEach(p=>{if(p.x<0||p.y<0||p.x+p.w>rollW+EPS)errors.push(`${p.item.label} buiten rolbreedte`)});
   for(let i=0;i<res.placed.length;i++)for(let j=i+1;j<res.placed.length;j++)if(intersects(res.placed[i],res.placed[j],kerf))errors.push(`${res.placed[i].item.label} overlapt ${res.placed[j].item.label}`);
   if(res.totalLen>rollL+EPS)errors.push("Benodigde lengte overschrijdt één rol.");
   lastPlan={...res,rollW,rollL,kerf,stats,project:$("#customerName").value};
   drawPlan(res,rollW);
-  $("#planStatus").innerHTML=errors.length?`<span class="warn">${esc(errors.join(". "))}</span>`:`<span class="ok">Snijplan gereed en technisch gecontroleerd.</span>`;
+  const splitMessage=splitNotices.length?`<br><span class="warn"><b>Let op – tweedelige ruiten:</b> ${splitNotices.map(esc).join(" ")}</span>`:"";
+  $("#planStatus").innerHTML=errors.length?`<span class="warn">${esc(errors.join(". "))}</span>${splitMessage}`:`<span class="ok">Snijplan gereed en technisch gecontroleerd.</span>${splitMessage}`;
   $("#planMetrics").innerHTML=`
     <div class="metric">Aantal stukken<strong>${res.placed.length}</strong></div>
     <div class="metric">Netto glasoppervlak<strong>${fmtN(stats.netArea)} m²</strong></div>
@@ -347,11 +422,10 @@ function renderPlan(res,rollW,rollL,kerf){
   calculatePrices();
 }
 $("#calculatePlan").onclick=async()=>{
-  const rollW=num($("#rollW").value),rollL=num($("#rollL").value),kerf=Math.max(0,num($("#kerf").value)||0),{items,errors}=readItems();
+  const rollW=num($("#rollW").value),rollL=num($("#rollL").value),kerf=Math.max(0,num($("#kerf").value)||0),{items,errors,splitNotices}=readItems(rollW);
   if(errors.length)return alert(errors.join("\n"));if(!(rollW>0&&rollL>0))return alert("Voer geldige rolmaten in.");
-  const tooWide=items.filter(x=>Math.min(x.w,x.canRotate?x.h:x.w)>rollW+EPS);if(tooWide.length)return alert(`Past niet op de rol: ${tooWide.map(x=>x.label).join(", ")}`);
   $("#calculatePlan").disabled=true;$("#progressBar").style.width="0%";
-  try{const res=await optimize(items,rollW,kerf,parseInt($("#quality").value,10));if(!res)return alert("Geen geldige indeling gevonden.");renderPlan(res,rollW,rollL,kerf)}
+  try{const res=await optimize(items,rollW,kerf,parseInt($("#quality").value,10));if(!res)return alert("Geen geldige indeling gevonden.");renderPlan(res,rollW,rollL,kerf,splitNotices)}
   finally{$("#calculatePlan").disabled=false}
 };
 
@@ -359,18 +433,16 @@ async function calculateAndProceed(){
   const plannerNextBtn=$('#plannerNext');
   if(!plannerNextBtn)return;
   if(lastPlan){activatePage('calc');return;}
-  const rollW=num($("#rollW").value),rollL=num($("#rollL").value),kerf=Math.max(0,num($("#kerf").value)||0),{items,errors}=readItems();
+  const rollW=num($("#rollW").value),rollL=num($("#rollL").value),kerf=Math.max(0,num($("#kerf").value)||0),{items,errors,splitNotices}=readItems(rollW);
   if(errors.length)return alert(errors.join("\n"));
   if(!(rollW>0&&rollL>0))return alert("Voer geldige rolmaten in.");
-  const tooWide=items.filter(x=>Math.min(x.w,x.canRotate?x.h:x.w)>rollW+EPS);
-  if(tooWide.length)return alert(`Past niet op de rol: ${tooWide.map(x=>x.label).join(", ")}`);
   const origText=plannerNextBtn.textContent;
   plannerNextBtn.disabled=true;plannerNextBtn.textContent='Berekenen…';
   $("#progressBar").style.width="0%";
   try{
     const res=await optimize(items,rollW,kerf,parseInt($("#quality").value,10));
     if(!res){plannerNextBtn.disabled=false;plannerNextBtn.textContent=origText;return alert("Geen geldige indeling gevonden.");}
-    renderPlan(res,rollW,rollL,kerf);
+    renderPlan(res,rollW,rollL,kerf,splitNotices);
     activatePage('calc');
   }finally{
     plannerNextBtn.disabled=false;plannerNextBtn.textContent=origText;
@@ -635,7 +707,7 @@ function buildPlanPDF(){
   if(!lastPlan||!requirePDF())return null;
   const {jsPDF}=window.jspdf,doc=new jsPDF({unit:"mm",format:"a4"}),r=lastPlan,left=15,top=28,drawW=180,drawH=245,scale=drawW/r.rollW,seg=drawH/scale,pages=Math.max(1,Math.ceil(r.totalLen/seg));
   for(let page=0;page<pages;page++){if(page)doc.addPage();const y0=page*seg,y1=Math.min(r.totalLen,(page+1)*seg);doc.setFontSize(14);doc.text(`GlassNext snijplan – ${r.project}`,left,12);doc.setFontSize(9);doc.text(`Pagina ${page+1}/${pages} | segment ${fmtN(y0/1000)}–${fmtN(y1/1000)} m | rolbreedte ${r.rollW} mm`,left,19);doc.rect(left,top,drawW,(y1-y0)*scale);
-    r.placed.forEach(p=>{const py0=Math.max(p.y,y0),py1=Math.min(p.y+p.h,y1);if(py1<=py0)return;const x=left+p.x*scale,y=top+(py0-y0)*scale,w=p.w*scale,h=(py1-py0)*scale;doc.setFillColor(225,235,245);doc.rect(x,y,w,h,"FD");if(p.y>=y0&&p.y<y1&&w>12&&h>5){doc.setFontSize(6.5);const netTxt=`Netto ${fmtN(p.item.netW/10,1)} × ${fmtN(p.item.netH/10,1)} cm`;const grossTxt=`Bruto ${fmtN(p.item.w/10,1)} × ${fmtN(p.item.h/10,1)} cm`;doc.text([`${p.item.label}${p.rotated?" R":""}`,netTxt,grossTxt],x+1.2,y+3.2,{maxWidth:Math.max(1,w-2.4),lineHeightFactor:1.05})}});
+    r.placed.forEach(p=>{const py0=Math.max(p.y,y0),py1=Math.min(p.y+p.h,y1);if(py1<=py0)return;const x=left+p.x*scale,y=top+(py0-y0)*scale,w=p.w*scale,h=(py1-py0)*scale;doc.setFillColor(225,235,245);doc.rect(x,y,w,h,"FD");if(p.y>=y0&&p.y<y1&&w>12&&h>5){doc.setFontSize(6.5);const netTxt=`Netto ${fmtN(p.item.netW/10,1)} × ${fmtN(p.item.netH/10,1)} cm`;const grossTxt=`Bruto ${fmtN(p.item.w/10,1)} × ${fmtN(p.item.h/10,1)} cm`;const seamTxt=p.item.split?`Naadzijde: ${p.item.seamSide} (geen snijrand)`:"";doc.text([`${p.item.label}${p.rotated?" R":""}`,netTxt,grossTxt,...(seamTxt?[seamTxt]:[])],x+1.2,y+3.2,{maxWidth:Math.max(1,w-2.4),lineHeightFactor:1.05})}});
     doc.setFontSize(8);doc.text(`Rollengte ${fmtN(r.totalLen/1000)} m | roloppervlak ${fmtN(r.stats.rollArea)} m² | snijverlies ${fmtN(r.stats.wasteArea)} m² (${fmtN(r.stats.loss,1)}%)`,left,285)}
   return doc;
 }
@@ -700,11 +772,13 @@ function collectProject(){
     placed:lastPlan.placed.map(p=>({
       label:p.item.label,baseId:p.item.baseId,copy:p.item.copy,room:p.item.room,
       x:p.x,y:p.y,w:p.w,h:p.h,
-      netW:p.item.netW,netH:p.item.netH,rotated:p.rotated,margin:p.item.margin
+      netW:p.item.netW,netH:p.item.netH,rotated:p.rotated,margin:p.item.margin,
+      split:p.item.split||false,splitPart:p.item.splitPart||null,splitAxis:p.item.splitAxis||null,seamSide:p.item.seamSide||null,
+      originalNetW:p.item.originalNetW||null,originalNetH:p.item.originalNetH||null
     }))
   }:null;
   console.log('[GN] collectProject planData=', planData?{placed:planData.placed.length,rollW:planData.rollW,totalLen:planData.totalLen}:null);
-  return{version:"GlassNext Suite v5.0-WP",savedAt:new Date().toISOString(),values,panes,otherCosts:readOtherCosts(),workorderData,exportData,planData};
+  return{version:"GlassNext Suite v5.1-WP",savedAt:new Date().toISOString(),values,panes,otherCosts:readOtherCosts(),workorderData,exportData,planData};
 }
 function renderWorkorderHTML(){
   if(!lastPlan)return"";
@@ -726,18 +800,16 @@ async function submitOffer(){
   if(!p.email||!p.email.trim())return alert("Vul uw e-mailadres in.");
   if(flowMode!=="measure"&&!lastPlan){
     console.log('[GN] No lastPlan, generating...');
-    const rollW=num($("#rollW").value),rollL=num($("#rollL").value),kerf=Math.max(0,num($("#kerf").value)||0),{items,errors}=readItems();
+    const rollW=num($("#rollW").value),rollL=num($("#rollL").value),kerf=Math.max(0,num($("#kerf").value)||0),{items,errors,splitNotices}=readItems(rollW);
     console.log('[GN] rollW=', rollW, 'rollL=', rollL, 'items=', items.length, 'errors=', errors);
     if(errors.length)return alert(errors.join("\n"));
     if(!(rollW>0&&rollL>0))return alert("Voer geldige rolmaten in.");
-    const tooWide=items.filter(x=>Math.min(x.w,x.canRotate?x.h:x.w)>rollW+EPS);
-    if(tooWide.length)return alert(`Past niet op de rol: ${tooWide.map(x=>x.label).join(", ")}`);
     const btn0=$("#submitOffer");if(btn0){btn0.disabled=true;btn0.textContent="Berekenen…";}
     try{
       const res=await optimize(items,rollW,kerf,parseInt($("#quality").value,10));
       console.log('[GN] optimize result=', !!res);
       if(!res){if(btn0){btn0.disabled=false;btn0.textContent="Offerte aanvragen";}return alert("Geen geldige indeling gevonden.");}
-      renderPlan(res,rollW,rollL,kerf);
+      renderPlan(res,rollW,rollL,kerf,splitNotices);
       console.log('[GN] renderPlan done, lastPlan=', !!lastPlan);
     }finally{
       if(btn0){btn0.disabled=false;btn0.textContent="Offerte aanvragen";}
