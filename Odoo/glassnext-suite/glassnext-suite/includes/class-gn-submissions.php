@@ -328,7 +328,7 @@ class GN_Submissions {
         $install_mode = $decoded['installMode'] ?? ($values['installMode'] ?? 'professional');
         if (($decoded['flowMode'] ?? 'self') === 'measure' || $install_mode !== 'self') {
             $items[] = [
-                'name'        => 'Voorrijdkosten',
+                'name'        => 'Voorrijkosten',
                 'description' => 'Nader te berekenen',
                 'quantity'    => 1,
                 'unitPrice'   => 0,

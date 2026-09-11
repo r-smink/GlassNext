@@ -28,7 +28,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
         </button>
         <button class="btn secondary choice-btn" id="choiceSelf" type="button">
           <div class="choice-title">Zelf opmeten</div>
-          <div class="choice-desc">U meet zelf de ruiten op en wij maken het snijplan en offerte.</div>
+          <div class="choice-desc">U meet zelf de ruiten op en vult deze in, in de NextGlass Suite, waarna de offerte volgt.</div>
           <div class="choice-price">Gratis</div>
         </button>
       </div>
@@ -59,13 +59,13 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
     <div class="card-head"><h2>Projectgegevens</h2><span class="pill">vul in voor offerte</span></div>
     <div class="card-body">
       <div class="fields">
-        <div><label>Klant / organisatie naam</label><input id="customerName" placeholder="Uw organisatie naam"></div>
+        <div><label>Klant / organisatie naam *</label><input id="customerName" placeholder="Uw organisatie naam" required></div>
         <div><label>Offertenummer</label><input id="offerNumber" readonly placeholder="wordt automatisch gegenereerd"></div>
         <div><label>Contactpersoon</label><input id="contactName"></div>
-        <div><label>E-mailadres</label><input id="email" type="email"></div>
-        <div><label>Telefoon</label><input id="phone"></div>
-        <div><label>Projectadres</label><input id="address"></div>
-        <div><label>Postcode en plaats</label><input id="city"></div>
+        <div><label>E-mailadres *</label><input id="email" type="email" required></div>
+        <div><label>Telefoon</label><input id="phone" inputmode="numeric" pattern="\\d{10}" title="Vul een 10-cijferig telefoonnummer in"></div>
+        <div><label>Projectadres *</label><input id="address" required></div>
+        <div><label>Postcode en plaats *</label><input id="city" required></div>
       </div>
       <div class="measure-only hidden" id="measureDates" style="margin-top:16px">
         <h3 style="margin:0 0 10px">Voorkeursdatums voor inmeten</h3>
@@ -88,6 +88,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
       </div>
       <div style="margin-top:12px"><label>Projectomschrijving / situatie</label><textarea id="projectDescription" placeholder="Bijvoorbeeld: bestaande beglazing voorzien van Nano-EcoLine Climate GlassShield."></textarea></div>
       <div style="margin-top:12px"><label>Bijzonderheden</label><textarea id="projectNotes" placeholder="Bereikbaarheid, planning, glasconditie, werktijden, aandachtspunten..."></textarea></div>
+      <div id="projectErrors" class="status warn" style="display:none;margin-top:14px"></div>
       <div style="margin-top:16px">
         <label>Foto's van de ruiten (optioneel, maximaal 3)</label>
         <div id="photoUploadArea" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
@@ -305,8 +306,8 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
             <option value="custom">Eigen technische waarden</option>
           </select>
         </div>
-        <div><label>Gasprijs (€/m³)</label><input id="roiGasPrice" type="number" min="0" step="0.01"></div>
-        <div><label>Elektriciteitsprijs (€/kWh)</label><input id="roiElecPrice" type="number" min="0" step="0.01"></div>
+        <div><label>Gasprijs (€/m³)</label><input id="roiGasPrice" type="number" min="0" step="0.01" placeholder="1.31"></div>
+        <div><label>Elektriciteitsprijs (€/kWh)</label><input id="roiElecPrice" type="number" min="0" step="0.01" placeholder="0.27"></div>
       </div>
       <div class="fields three" style="margin-top:16px">
         <div><label>Investeringsbron</label><select id="roiInvestmentSource" disabled><option value="calculation" selected>Projectcalculatie excl. btw</option></select></div>

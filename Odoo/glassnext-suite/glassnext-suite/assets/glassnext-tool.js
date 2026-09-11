@@ -44,9 +44,12 @@ function initConfig(){
     const rates={easy:O.gn_mount_rate_easy,average:O.gn_mount_rate_average,complex:O.gn_mount_rate_complex,very:O.gn_mount_rate_very};
     msp.value=num(rates[cls])||MOUNT_DEFAULT_RATES[cls]||45;
   }
+  const gp=$("#roiGasPrice"); if(gp&&!num(gp.value)) gp.value="1.31";
+  const ep=$("#roiElecPrice"); if(ep&&!num(ep.value)) ep.value="0.27";
 }
 
 const PAGES=["choice","planner","calc","roi","project","offer","workorder","exports"];
+let currentPage="choice",ignoreNextHistory=false;
 function visiblePages(){return PAGES.filter(p=>{const t=$(`.tab[data-page="${p}"]`);return t&&!t.classList.contains("hidden")})}
 function activatePage(name){
   $$(".tab").forEach(b=>b.classList.toggle("active",b.dataset.page===name));
@@ -56,6 +59,11 @@ function activatePage(name){
   if(name==="workorder")renderWorkorder();
   if(name==="exports")renderExportSummary();
   renderNavButtons(name);
+  if(name!==currentPage){
+    if(!ignoreNextHistory){try{history.pushState({page:name},"");}catch(e){}}
+    else ignoreNextHistory=false;
+    currentPage=name;
+  }
 }
 function renderNavButtons(current){
   const vis=visiblePages();
@@ -208,8 +216,12 @@ document.addEventListener("click",e=>{
   if(!btn||btn.disabled)return;
   if(btn.id==="submitOffer")return;
   if(btn.id==="plannerNext"&&flowMode==="self")return;
+  if(btn.id==="projectSubmit"&&flowMode!=="measure"){ if(!validateProject()) return; }
   const t=btn.dataset.target;
   if(t)activatePage(t);
+});
+window.addEventListener("popstate",e=>{
+  if(e.state&&e.state.page&&PAGES.includes(e.state.page)){ignoreNextHistory=true;activatePage(e.state.page);}
 });
 const consentCb=$("#offerConsent");
 if(consentCb){
@@ -491,7 +503,7 @@ function calculatePrices(){
   $("#calcWarning").innerHTML='<span class="ok">Calculatie bijgewerkt op basis van het actuele snijplan.</span>';
   $("#calcMetrics").innerHTML=`<div class="metric">Netto glas<strong>${fmtN(s.netArea)} m²</strong></div><div class="metric">Te factureren materiaal<strong>${fmtN(s.rollArea)} m²</strong></div><div class="metric">Aantal voorgesneden stukken<strong>${pieces}</strong></div><div class="metric">Montageklasse<strong>${mountClassText()}</strong></div>`;
   const otherRows=otherCosts.filter(x=>x.amount>0).map(x=>`<tr><td>${esc(x.description||"Overige kosten")}</td><td>Overige kosten</td><td></td><td>${fmtMoney(x.amount)}</td></tr>`).join("");
-  const voorrijdRow=(flowMode==='measure'||!selfInstall)?`<tr><td>Voorrijdkosten</td><td>Nader te berekenen</td><td></td><td>Nader te berekenen</td></tr>`:"";
+  const voorrijdRow=(flowMode==='measure'||!selfInstall)?`<tr><td>Voorrijkosten</td><td>Nader te berekenen*</td><td></td><td>Nader te berekenen*</td></tr>`:"";
   $("#calcRows").innerHTML=`
     <tr><td>GlassShield materiaal</td><td>${fmtN(s.rollArea)} m² rolverbruik</td><td>${fmtMoney(matRate)}/m²</td><td>${fmtMoney(matGross)}</td></tr>
     ${matDisc?`<tr><td>Materiaalkorting</td><td>${fmtN(num($("#materialDiscount").value),1)}%</td><td></td><td>- ${fmtMoney(matDisc)}</td></tr>`:""}
@@ -526,6 +538,29 @@ function projectData(){
     data.prefTime3=$("#prefTime3")?.value||"";
   }
   return data;
+}
+function validateProject(){
+  const p=projectData();
+  const errs=[];
+  if(!p.customerName||!p.customerName.trim()) errs.push("Vul uw klant / organisatie naam in.");
+  if(!p.email||!p.email.trim()) errs.push("Vul uw e-mailadres in.");
+  else if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(p.email.trim())) errs.push("Vul een geldig e-mailadres in.");
+  if(!p.address||!p.address.trim()) errs.push("Vul uw projectadres in.");
+  if(!p.city||!p.city.trim()) errs.push("Vul uw postcode en woonplaats in.");
+  if(p.phone&&p.phone.trim()){
+    const digits=p.phone.replace(/\\D/g,"");
+    if(!/^\\d{10}$/.test(digits)) errs.push("Vul een geldig telefoonnummer in (10 cijfers).");
+  }
+  if(flowMode==="measure"&&!(p.prefDate1||p.prefDate2||p.prefDate3)) errs.push("Vul minimaal één voorkeursdatum in.");
+  const box=$("#projectErrors");
+  if(errs.length){
+    if(box){box.innerHTML=errs.map(e=>`<p style="margin:0 0 4px 0">• ${esc(e)}</p>`).join("");box.style.display="block";}
+    const first=$("#customerName:invalid,#email:invalid,#address:invalid,#city:invalid,#phone:invalid");
+    if(first) first.focus();
+    return false;
+  }
+  if(box){box.style.display="none";box.innerHTML="";}
+  return true;
 }
 function companyHeader(){
   return `<div class="doc-head"><div><div class="doc-brand">Glass Next B.V.</div><div>Nano-EcoLine Climate GlassShield</div></div><div style="text-align:right"><b>Isoleren zonder glas te vervangen.</b><br><span class="note">Nanothermische Low-E glas-upgrade</span></div></div>`;
@@ -659,11 +694,12 @@ function renderOffer(){
     <tr><td>${fmtN(s.rollArea)} m² Nano-EcoLine Climate GlassShield à ${fmtMoney(c.matRate)}/m²</td><td>${fmtMoney(c.matGross)}</td></tr>
     ${c.matDisc?`<tr><td>Projectkorting materiaal</td><td>- ${fmtMoney(c.matDisc)}</td></tr>`:""}
     <tr><td>Voorsnijden ${c.pieces} stuks à ${fmtMoney(c.cutRate)}</td><td>${fmtMoney(c.cut)}</td></tr>
-    ${c.selfInstall?"":`<tr><td>Aanbrengen GlassShield – montageklasse ${mountClassText()} (${fmtN(c.mountArea)} m²)</td><td>Nader te berekenen</td></tr>`}
+    ${c.selfInstall?"":`<tr><td>Aanbrengen GlassShield – montageklasse ${mountClassText()} (${fmtN(c.mountArea)} m²)</td><td>Nader te berekenen*</td></tr>`}
     ${c.selfInstall?"":(c.mountDisc?`<tr><td>Projectkorting montage</td><td>- ${fmtMoney(c.mountDisc)}</td></tr>`:"")}
     ${(c.otherCosts||[]).filter(x=>x.amount>0).map(x=>`<tr><td>${esc(x.description||"Overige kosten")}</td><td>${fmtMoney(x.amount)}</td></tr>`).join("")}
-    ${(flowMode==='measure'||!c.selfInstall)?`<tr><td>Voorrijdkosten</td><td>Nader te berekenen</td></tr>`:""}
+    ${(flowMode==='measure'||!c.selfInstall)?`<tr><td>Voorrijkosten</td><td>Nader te berekenen*</td></tr>`:""}
     <tr class="total-row"><td>Totaal excl. btw</td><td>${fmtMoney(c.subtotal)}</td></tr><tr><td>${fmtN(c.vatRate,1)}% btw</td><td>${fmtMoney(c.vat)}</td></tr><tr class="grand-row"><td>Totaal incl. btw</td><td>${fmtMoney(c.total)}</td></tr></tbody></table>
+    ${(flowMode==='measure'||!c.selfInstall)?`<p class="note" style="font-size:11px">* Nader te berekenen op basis van ingevulde gegevens en aangeleverde foto's.</p>`:""}
     ${c.selfInstall?"":`<h3>Werkzaamheden montage</h3><ul><li>Bevochtigen en reinigen van de glasoppervlakken</li><li>Voorbereiden en positioneren van GlassShield</li><li>Verwijderen van vocht en luchtinsluitingen</li><li>Schoonsnijden en afwerken van de folie</li><li>Reinigen van glas, kozijnen en vensterbanken</li></ul>`}
     ${p.projectNotes?`<h3>Bijzonderheden</h3><p>${esc(p.projectNotes)}</p>`:""}
     ${roiOfferHTML()}
@@ -734,12 +770,13 @@ function docToPDF(type){
       [`GlassShield materiaal`,c.matGross],
       [`Materiaalkorting`,-c.matDisc],
       [`Voorsnijden (${c.pieces} stuks)`,c.cut],
-      ...(c.selfInstall?[]:[[`Montage – ${mountClassText()}`,`Nader te berekenen`],[`Montagekorting`,-c.mountDisc]]),
+      ...(c.selfInstall?[]:[[`Montage – ${mountClassText()}`,`Nader te berekenen*`],[`Montagekorting`,-c.mountDisc]]),
       ...(c.otherCosts||[]).map(x=>[x.description||"Overige kosten",x.amount]),
-      ...((flowMode==='measure'||!c.selfInstall)?[[`Voorrijdkosten`,`Nader te berekenen`]]:[])
+      ...((flowMode==='measure'||!c.selfInstall)?[[`Voorrijkosten`,`Nader te berekenen*`]]:[])
     ];
     offerCostRows.filter(x=>typeof x[1]==="string"||Math.abs(x[1])>.001).forEach(([t,v])=>{doc.text(String(t),15,y,{maxWidth:145});doc.text(typeof v==="string"?v:fmtMoney(v),195,y,{align:"right"});y+=7});
     doc.line(15,y,195,y);y+=7;doc.setFont("helvetica","bold");doc.text("Totaal excl. btw",15,y);doc.text(fmtMoney(c.subtotal),195,y,{align:"right"});y+=7;doc.setFont("helvetica","normal");doc.text(`${fmtN(c.vatRate,1)}% btw`,15,y);doc.text(fmtMoney(c.vat),195,y,{align:"right"});y+=8;doc.setFont("helvetica","bold");doc.text("Totaal incl. btw",15,y);doc.text(fmtMoney(c.total),195,y,{align:"right"});
+    if(flowMode==='measure'||!c.selfInstall){y+=10;doc.setFontSize(8);doc.setFont("helvetica","normal");doc.text("* Nader te berekenen op basis van ingevulde gegevens en aangeleverde foto's.",15,y,{maxWidth:180});}
     doc.save(`${safe(p.customerName)}_offerte.pdf`);
   }
 }
@@ -795,9 +832,8 @@ async function submitOffer(){
   console.log('[GN] submitOffer called, flowMode=', flowMode, 'lastPlan=', !!lastPlan);
   const cb=$("#offerConsent");
   if(cb&&!cb.checked)return alert("U moet akkoord gaan met de voorwaarden voordat u een offerte kunt aanvragen.");
+  if(!validateProject()){ activatePage('project'); return; }
   const p=projectData();
-  if(!p.customerName||!p.customerName.trim())return alert("Vul uw klant / organisatie naam in.");
-  if(!p.email||!p.email.trim())return alert("Vul uw e-mailadres in.");
   if(flowMode!=="measure"&&!lastPlan){
     console.log('[GN] No lastPlan, generating...');
     const rollW=num($("#rollW").value),rollL=num($("#rollL").value),kerf=Math.max(0,num($("#kerf").value)||0),{items,errors,splitNotices}=readItems(rollW);
@@ -894,10 +930,8 @@ if(projectSubmitBtn)projectSubmitBtn.addEventListener('click',e=>{
     const measureBtn=$('#submitMeasure')||$('#projectSubmit');
     if(measureBtn){
       measureBtn.id='submitOffer';
+      if(!validateProject()) return;
       const p=projectData();
-      if(!p.customerName||!p.customerName.trim())return alert("Vul uw klant / organisatie naam in.");
-      if(!p.email||!p.email.trim())return alert("Vul uw e-mailadres in.");
-      if(!p.prefDate1&&!p.prefDate2&&!p.prefDate3)return alert("Vul minimaal één voorkeursdatum in.");
       const btn=measureBtn;btn.disabled=true;const orig=btn.textContent;btn.textContent="Verzenden…";
       const statusDiv=document.createElement('div');statusDiv.className='status';statusDiv.id='submitStatus';statusDiv.style.marginTop='12px';
       const cardBody=btn.closest('.page-nav')?.previousElementSibling?.querySelector('.card-body')||btn.closest('.page');
@@ -1007,4 +1041,5 @@ initConfig();
 applyROIProfile();
 initTooltips();
 initPhotoUpload();
+try{history.replaceState({page:currentPage},"");}catch(e){}
 }
