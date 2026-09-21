@@ -19,7 +19,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
   <article class="card span-12">
     <div class="card-head"><h2>Welkom bij GlassNext Suite</h2></div>
     <div class="card-body">
-      <p class="choice-intro">Wilt u uw beglazing isoleren met Nano-EcoLine Climate GlassShield? Kies hieronder hoe u wilt beginnen.</p>
+      <p class="choice-intro">Wilt u snel een prijsberekening? Voer dan eenvoudig zelf de maten van uw ruiten in. Laat u het inmeten liever aan ons over? Plan dan direct een afspraak in bij u op locatie. Wij komen dan graag bij u langs om een vrijblijvende offerte op te maken.</p>
       <div class="choice-grid">
         <button class="btn choice-btn" id="choiceMeasure" type="button">
           <div class="choice-title">Laten opmeten</div>
@@ -160,7 +160,6 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
   <article class="card span-12">
     <div class="card-head">
       <h2>Ramen invoeren</h2>
-      <div class="toolbar no-print"><button class="btn secondary" id="demoPanes">Demo laden</button></div>
     </div>
     <div class="card-body">
       <div class="table-wrap scroll-hint pane-table-wrap">
@@ -352,7 +351,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
     <div class="card-body">
       <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;cursor:pointer;font-size:13px;line-height:1.5">
         <input type="checkbox" id="offerConsent" style="width:auto;margin-top:3px">
-        <span>Ik begrijp dat deze offerte een scenarioanalyse is afhankelijk van de werkelijke glasopbouw, gebouwcondities, installaties, energieprijzen en het gebruik. Aan de uitkomst kunnen geen gegarandeerde besparingen worden ontleend. Deze offerte is gebaseerd op de ingevoerde ruitmaten en het berekende snijplan. Definitieve maatvoering en geschiktheid van de beglazing worden vóór uitvoering gecontroleerd.</span>
+        <span>Ik begrijp dat deze offerte een scenarioanalyse is, exclusief de montagekosten, en afhankelijk is van de werkelijke glasopbouw, gebouwcondities, installaties, energieprijzen en het gebruik. Aan de uitkomst kunnen geen gegarandeerde besparingen worden ontleend. Deze offerte is gebaseerd op de ingevoerde ruitmaten en het berekende snijplan. Definitieve maatvoering en geschiktheid van de beglazing worden vóór uitvoering gecontroleerd.</span>
       </label>
       <div id="submitStatus" class="status" style="margin-top:12px"></div>
     </div>

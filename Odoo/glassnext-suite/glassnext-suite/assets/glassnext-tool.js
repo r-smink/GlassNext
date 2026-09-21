@@ -81,7 +81,7 @@ function renderNavButtons(current){
     if(nextPage)next.dataset.target=nextPage;
     if(current==="offer"&&next.id==="submitOffer"){
       const cb=$("#offerConsent");
-      if(cb&&!cb.checked)next.disabled=true;
+      next.disabled=!cb||!cb.checked;
     }
   }
 }
@@ -251,11 +251,6 @@ function addPaneRow(p={}){
   paneBody.appendChild(tr);
 }
 $("#addPane").onclick=()=>addPaneRow();
-$("#demoPanes").onclick=()=>{paneBody.innerHTML="";[
-  {id:"R1",w:140,h:200,n:2,room:"Woonkamer"},
-  {id:"R2",w:48,h:96,n:6,room:"Entree"},
-  {id:"R3",w:88,h:68,n:4,room:"Slaapkamer"}
-].forEach(addPaneRow)};
 addPaneRow();
 
 function readItems(rollW=null){
@@ -470,6 +465,11 @@ function selectedMountRate(){
   return Math.max(0,num(rates[cls])||MOUNT_DEFAULT_RATES[cls]||0);
 }
 function mountClassText(){return {easy:"Eenvoudig",average:"Gemiddeld",complex:"Complex",very:"Zeer complex"}[$("#mountClass").value]}
+function roiMountRate(){return num(O.gn_mount_rate_average)||45}
+function roiMountEstimate(){
+  if(!lastCalc||lastCalc.selfInstall||!lastPlan)return 0;
+  return lastPlan.stats.netArea*roiMountRate();
+}
 
 function addOtherCostRow(p={}){
   const row=document.createElement("div");
@@ -603,7 +603,7 @@ function updateROIDerived(){
 }
 function syncROIFromProject(){
   if($("#roiAreaSource").value==="planner"&&lastPlan)$("#roiArea").value=lastPlan.stats.netArea.toFixed(4);
-  if($("#roiInvestmentSource").value==="calculation"&&lastCalc)$("#roiInvestment").value=lastCalc.subtotal.toFixed(2);
+  if($("#roiInvestmentSource").value==="calculation"&&lastCalc)$("#roiInvestment").value=(lastCalc.subtotal-(lastCalc.mountGross-lastCalc.mountDisc)+roiMountEstimate()).toFixed(2);
 }
 function calculateROI(){
   syncROIFromProject();updateROIDerived();
@@ -616,9 +616,10 @@ function calculateROI(){
   const energyValue=gasValue+elecValue,co2KgM2=gasM2*co2Gas+coolM2*co2Elec,co2Kg=co2KgM2*area,co2Tons=co2Kg/1000,co2Value=co2Tons*co2Price,totalValue=energyValue+co2Value;
   const pbtEnergy=energyValue>0?netInvest/energyValue:NaN,pbtIncl=totalValue>0?netInvest/totalValue:NaN,years=Math.max(1,parseInt($("#roiYears").value||"10",10));
   const cumulative=totalValue*years,roiPct=netInvest>0?(cumulative-netInvest)/netInvest*100:NaN;
+  const mountEst=roiMountEstimate(),mountRate=lastCalc&&!lastCalc.selfInstall?roiMountRate():0;
   lastROI={glassType:$("#roiGlassType option:checked").textContent,area,uBefore:num($("#roiUBefore").value)||0,uAfter:num($("#roiUAfter").value)||0,uDelta:num($("#roiUDelta").value)||0,
     improvement:num($("#roiImprovement").value)||0,btuBefore:num($("#roiBTUBefore").value)||0,btuAfter:num($("#roiBTUAfter").value)||0,btuDelta:num($("#roiBTUDelta").value)||0,
-    gasM2,coolM2,investment,eia,netInvest,gasYear,coolYear,gasValue,elecValue,energyValue,co2KgM2,co2Kg,co2Tons,co2Value,totalValue,pbtEnergy,pbtIncl,years,cumulative,roiPct,factor};
+    gasM2,coolM2,investment,mountEst,mountRate,eia,netInvest,gasYear,coolYear,gasValue,elecValue,energyValue,co2KgM2,co2Kg,co2Tons,co2Value,totalValue,pbtEnergy,pbtIncl,years,cumulative,roiPct,factor};
   $("#roiStatus").innerHTML=area>0&&investment>0?'<span class="ok">ROI-berekening bijgewerkt.</span>':'<span class="warn">Vul een glasoppervlak en investering in, of bereken eerst het project.</span>';
   $("#roiMetrics").innerHTML=`
     <div class="metric">Glastype<strong>${esc(lastROI.glassType)}</strong></div>
@@ -639,6 +640,7 @@ function calculateROI(){
     <tr><td>Koel-/elektrabesparing</td><td>${fmtN(coolM2,2)} kWh</td><td>${fmtN(coolYear)} kWh</td><td>${fmtMoney(elecValue)}</td></tr>
     <tr><td>CO₂-reductie</td><td>${fmtN(co2KgM2,2)} kg</td><td>${fmtN(co2Tons,2)} ton</td><td>${fmtMoney(co2Value)}</td></tr>
     <tr class="total-row"><td>Totaal jaarlijks voordeel</td><td></td><td></td><td>${fmtMoney(totalValue)}</td></tr>
+    ${mountEst>0?`<tr><td>Calculatie excl. montage</td><td></td><td></td><td>${fmtMoney(investment-mountEst)}</td></tr><tr><td>Montage-indicatie (gemiddeld à ${fmtMoney(mountRate)}/m²)</td><td></td><td></td><td>${fmtMoney(mountEst)}</td></tr>`:""}
     <tr><td>Bruto investering</td><td></td><td></td><td>${fmtMoney(investment)}</td></tr>
     <tr><td>EIA/subsidievoordeel</td><td></td><td></td><td>- ${fmtMoney(eia)}</td></tr>
     <tr class="grand-row"><td>Netto investering</td><td></td><td></td><td>${fmtMoney(netInvest)}</td></tr>`;
@@ -672,7 +674,7 @@ function roiPDF(){
   y+=4;doc.setFont("helvetica","bold");doc.text("Jaarlijkse besparingen",15,y);doc.setFont("helvetica","normal");y+=8;
   [[`Gas`,`${fmtN(r.gasYear)} m³ | ${fmtMoney(r.gasValue)}`],[`Elektriciteit`,`${fmtN(r.coolYear)} kWh | ${fmtMoney(r.elecValue)}`],[`CO₂`,`${fmtN(r.co2Tons,2)} ton | ${fmtMoney(r.co2Value)}`],[`Totaal voordeel`,fmtMoney(r.totalValue)]].forEach(([a,b])=>{doc.text(a,15,y);doc.text(b,195,y,{align:"right"});y+=7});
   y+=5;doc.setFont("helvetica","bold");doc.text("Investering en terugverdientijd",15,y);doc.setFont("helvetica","normal");y+=8;
-  [[`Bruto investering`,fmtMoney(r.investment)],[`EIA/subsidievoordeel`,"- "+fmtMoney(r.eia)],[`Netto investering`,fmtMoney(r.netInvest)],[`TVT energie-only`,isFinite(r.pbtEnergy)?fmtN(r.pbtEnergy,2)+" jaar":"—"],[`TVT incl. CO₂`,isFinite(r.pbtIncl)?fmtN(r.pbtIncl,2)+" jaar":"—"],[`ROI na ${r.years} jaar`,isFinite(r.roiPct)?fmtN(r.roiPct,1)+"%":"—"]].forEach(([a,b])=>{doc.text(a,15,y);doc.text(b,195,y,{align:"right"});y+=7});
+  [...(r.mountEst>0?[[`Calculatie excl. montage`,fmtMoney(r.investment-r.mountEst)],[`Montage-indicatie (gemiddeld à ${fmtMoney(r.mountRate)}/m²)`,fmtMoney(r.mountEst)]]:[]),[`Bruto investering`,fmtMoney(r.investment)],[`EIA/subsidievoordeel`,"- "+fmtMoney(r.eia)],[`Netto investering`,fmtMoney(r.netInvest)],[`TVT energie-only`,isFinite(r.pbtEnergy)?fmtN(r.pbtEnergy,2)+" jaar":"—"],[`TVT incl. CO₂`,isFinite(r.pbtIncl)?fmtN(r.pbtIncl,2)+" jaar":"—"],[`ROI na ${r.years} jaar`,isFinite(r.roiPct)?fmtN(r.roiPct,1)+"%":"—"]].forEach(([a,b])=>{doc.text(a,15,y);doc.text(b,195,y,{align:"right"});y+=7});
   y+=10;doc.setFontSize(8);const note="Deze berekening is een scenarioanalyse. Werkelijke prestaties zijn afhankelijk van onder andere glasopbouw, oriëntatie, klimaat, installaties, bezetting, ventilatie en gebouwgebruik. De uitkomst is geen garantie.";doc.text(doc.splitTextToSize(note,180),15,y);
   doc.save(`${safe(p.customerName)}_ROI.pdf`);
 }
