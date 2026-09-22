@@ -63,7 +63,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
         <div><label>Offertenummer</label><input id="offerNumber" readonly placeholder="wordt automatisch gegenereerd"></div>
         <div><label>Contactpersoon</label><input id="contactName"></div>
         <div><label>E-mailadres *</label><input id="email" type="email" required></div>
-        <div><label>Telefoon</label><input id="phone" inputmode="numeric" pattern="\\d{10}" title="Vul een 10-cijferig telefoonnummer in"></div>
+        <div><label>Telefoon</label><input id="phone" inputmode="numeric"></div>
         <div><label>Projectadres *</label><input id="address" required></div>
         <div><label>Postcode en plaats *</label><input id="city" required></div>
       </div>

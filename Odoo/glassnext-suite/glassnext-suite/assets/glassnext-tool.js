@@ -544,18 +544,14 @@ function validateProject(){
   const errs=[];
   if(!p.customerName||!p.customerName.trim()) errs.push("Vul uw klant / organisatie naam in.");
   if(!p.email||!p.email.trim()) errs.push("Vul uw e-mailadres in.");
-  else if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(p.email.trim())) errs.push("Vul een geldig e-mailadres in.");
+  else if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email.trim())) errs.push("Vul een geldig e-mailadres in.");
   if(!p.address||!p.address.trim()) errs.push("Vul uw projectadres in.");
   if(!p.city||!p.city.trim()) errs.push("Vul uw postcode en woonplaats in.");
-  if(p.phone&&p.phone.trim()){
-    const digits=p.phone.replace(/\\D/g,"");
-    if(!/^\\d{10}$/.test(digits)) errs.push("Vul een geldig telefoonnummer in (10 cijfers).");
-  }
   if(flowMode==="measure"&&!(p.prefDate1||p.prefDate2||p.prefDate3)) errs.push("Vul minimaal één voorkeursdatum in.");
   const box=$("#projectErrors");
   if(errs.length){
     if(box){box.innerHTML=errs.map(e=>`<p style="margin:0 0 4px 0">• ${esc(e)}</p>`).join("");box.style.display="block";}
-    const first=$("#customerName:invalid,#email:invalid,#address:invalid,#city:invalid,#phone:invalid");
+    const first=$("#customerName:invalid,#email:invalid,#address:invalid,#city:invalid");
     if(first) first.focus();
     return false;
   }
