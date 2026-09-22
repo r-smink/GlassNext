@@ -19,21 +19,22 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
   <article class="card span-12">
     <div class="card-head"><h2>Welkom bij GlassNext Suite</h2></div>
     <div class="card-body">
-      <p class="choice-intro">Wilt u snel een prijsberekening? Voer dan eenvoudig zelf de maten van uw ruiten in. Laat u het inmeten liever aan ons over? Plan dan direct een afspraak in bij u op locatie. Wij komen dan graag bij u langs om een vrijblijvende offerte op te maken.</p>
+      <p class="choice-intro">Wil je snel een prijsberekening? Voer dan eenvoudig zelf de maten van je ruiten in. Laat je het inmeten liever aan ons over? Plan dan direct een afspraak in bij jou op locatie. Wij komen dan graag bij je langs om een vrijblijvende offerte op te maken.</p>
       <div class="choice-grid">
         <button class="btn choice-btn" id="choiceMeasure" type="button">
           <div class="choice-title">Laten opmeten</div>
-          <div class="choice-desc">Wij komen bij u langs om de ruiten professioneel op te meten.</div>
-          <div class="choice-price">€ 149,-</div>
+          <div class="choice-desc">Wij komen bij je langs om de ruiten professioneel op te meten.</div>
+			<div class="choice-desc">Nu tijdelijk van <strike>€ 149</strike></div>
+				<div class="choice-price">voor € 74,50</div>
         </button>
         <button class="btn secondary choice-btn" id="choiceSelf" type="button">
           <div class="choice-title">Zelf opmeten</div>
-          <div class="choice-desc">U meet zelf de ruiten op en vult deze in, in de NextGlass Suite, waarna de offerte volgt.</div>
+          <div class="choice-desc">Je meet zelf de ruiten op en vult deze in, in de NextGlass Suite, waarna de offerte volgt.</div>
           <div class="choice-price">Gratis</div>
         </button>
       </div>
       <div id="installChoice" class="hidden">
-        <h3 class="choice-subtitle">Wilt u de folie zelf aanbrengen of door GlassNext laten aanbrengen?</h3>
+        <h3 class="choice-subtitle">Wil je de folie zelf aanbrengen of door GlassNext laten aanbrengen?</h3>
         <div class="choice-grid">
           <button class="btn choice-btn install-choice-btn" id="choiceInstallPro" type="button">
             <div class="choice-title">Folie laten aanbrengen door GlassNext</div>
@@ -41,7 +42,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
           </button>
           <button class="btn secondary choice-btn install-choice-btn" id="choiceInstallSelf" type="button">
             <div class="choice-title">Folie zelf aanbrengen</div>
-            <div class="choice-desc">U brengt de folie zelf aan. Wij leveren het snijplan en voorgesneden materiaal.</div>
+            <div class="choice-desc">Je brengt de folie zelf aan. Wij leveren het snijplan en voorgesneden materiaal.</div>
           </button>
         </div>
       </div>
@@ -68,7 +69,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
         <div><label>Postcode en plaats *</label><input id="city" required></div>
       </div>
       <div class="measure-only hidden" id="measureDates" style="margin-top:16px">
-        <h3 style="margin:0 0 10px">Voorkeursdatums voor inmeten</h3>
+        <h3 style="margin:0 0 10px">Voorkeursdata voor inmeten</h3>
         <div class="fields three">
           <div><label>Voorkeursdatum 1</label><input id="prefDate1" type="date"></div>
           <div><label>Voorkeursdatum 2</label><input id="prefDate2" type="date"></div>
@@ -84,7 +85,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
           <div><label>Tijd 2 (optioneel)</label><input id="prefTime2" type="time"></div>
           <div><label>Tijd 3 (optioneel)</label><input id="prefTime3" type="time"></div>
         </div>
-        <p class="note" style="margin-top:8px">Wij plannen de inmeting op basis van uw voorkeursdatums. U ontvangt een bevestiging met de definitieve afspraak.</p>
+        <p class="note" style="margin-top:8px">Wij plannen de inmeting op basis van jouw voorkeursdata. Je ontvangt een bevestiging met de definitieve afspraak.</p>
       </div>
       <div style="margin-top:12px"><label>Projectomschrijving / situatie</label><textarea id="projectDescription" placeholder="Bijvoorbeeld: bestaande beglazing voorzien van Nano-EcoLine Climate GlassShield."></textarea></div>
       <div style="margin-top:12px"><label>Bijzonderheden</label><textarea id="projectNotes" placeholder="Bereikbaarheid, planning, glasconditie, werktijden, aandachtspunten..."></textarea></div>
@@ -238,7 +239,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
   </article>
 
   <article class="card span-12">
-    <div class="card-head"><h2>Projectcalculatie</h2><button class="btn no-print" id="recalculate">Bereken prijzen</button></div>
+    <div class="card-head"><h2>Projectcalculatie</h2><button class="btn no-print" id="recalculate" style="display:none;">Bereken prijzen</button></div>
     <div class="card-body">
       <div id="calcWarning" class="status warn">Bereken eerst een snijplan.</div>
       <div id="calcMetrics" class="metrics"></div>
@@ -290,7 +291,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
   </article>
 
   <article class="card span-12">
-    <div class="card-head"><h2>Financiële en CO₂-uitgangspunten</h2><button class="btn no-print" id="calculateROI">Bereken ROI</button></div>
+    <div class="card-head"><h2>Financiële en CO₂-uitgangspunten</h2><button class="btn no-print" id="calculateROI" style="display:none;">Bereken ROI</button></div>
     <div class="card-body">
       <div class="fields three">
         <div><label>Te verbeteren glastype</label>
@@ -343,7 +344,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
 <section class="page" id="page-offer">
 <div class="grid">
   <article class="card span-12">
-    <div class="card-head"><h2>Offerte</h2><div class="toolbar no-print"><button class="btn" id="refreshOffer">Offerte vernieuwen</button><button class="btn secondary" id="offerPDF">Maak offerte-PDF</button><button class="btn secondary" id="printOffer">Afdrukken / bewaren als PDF</button></div></div>
+    <div class="card-head"><h2>Offerte</h2><div class="toolbar no-print"><button class="btn" id="refreshOffer" style="display:none;">Offerte vernieuwen</button><button class="btn secondary" id="offerPDF" style="display:none;">Maak offerte-PDF</button><button class="btn secondary" id="printOffer">Afdrukken / bewaren als PDF</button></div></div>
     <div class="card-body"><div id="offerDoc" class="doc"></div></div>
   </article>
   <article class="card span-12">
