@@ -336,26 +336,50 @@ function candidates(placed,rollW,g){
   return arr.sort((a,b)=>a.y-b.y||a.x-b.x);
 }
 function lexLess(a,b){for(let i=0;i<a.length;i++){if(a[i]<b[i])return true;if(a[i]>b[i])return false}return false}
-function placeSequence(seq,rollW,kerf){
+async function placeSequence(seq,rollW,kerf,onWork){
   const placed=[];
+  let currentMaxY=0, workCounter=0, lastYield=performance.now();
+
   for(const item of seq){
-    let best=null;const oris=[{w:item.w,h:item.h,rotated:false}];
+    let best=null;
+    const oris=[{w:item.w,h:item.h,rotated:false}];
     if(item.canRotate&&Math.abs(item.w-item.h)>EPS)oris.push({w:item.h,h:item.w,rotated:true});
     const pts=candidates(placed,rollW,kerf);
+
     for(const o of oris){
       if(o.w>rollW+EPS)continue;
       for(const pt of pts){
         if(pt.x+o.w>rollW+EPS)continue;
         const t={x:pt.x,y:pt.y,w:o.w,h:o.h};
         if(placed.some(p=>intersects(t,p,kerf)))continue;
-        const newLen=Math.max(t.y+t.h,...placed.map(p=>p.y+p.h),0);
+        const newLen=Math.max(currentMaxY,t.y+t.h);
         const score=[newLen,t.y,t.x,o.rotated?1:0];
         if(!best||lexLess(score,best.score))best={...t,rotated:o.rotated,item,score};
+
+        // BELANGRIJK: géén await/Promise meer bij ieder kandidaatpunt.
+        // Alleen zeer sporadisch controleren of de browser even lucht nodig heeft.
+        // Zo blijft de rekensnelheid vrijwel gelijk aan de oorspronkelijke Suite.
+        workCounter++;
+        if((workCounter & 8191)===0 && performance.now()-lastYield>120){
+          if(onWork)onWork();
+          await new Promise(requestAnimationFrame);
+          lastYield=performance.now();
+        }
       }
     }
-    if(!best)return null;placed.push(best);
+
+    if(!best)return null;
+    placed.push(best);
+    currentMaxY=Math.max(currentMaxY,best.y+best.h);
+
+    // Alleen tussen complete stukken eventueel kort teruggeven aan de browser.
+    if(performance.now()-lastYield>120){
+      if(onWork)onWork();
+      await new Promise(requestAnimationFrame);
+      lastYield=performance.now();
+    }
   }
-  return{placed,totalLen:Math.max(0,...placed.map(p=>p.y+p.h))};
+  return{placed,totalLen:currentMaxY};
 }
 function rng(seed){return function(){let t=seed+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
 function shuffle(a,r){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b}
@@ -374,12 +398,19 @@ function orders(items,n){
 }
 async function optimize(items,rollW,kerf,attempts){
   let best=null,all=orders(items,attempts);
+  const updateProgress=(i)=>{
+    $("#progressBar").style.width=`${Math.round((i+1)/all.length*100)}%`;
+    $("#planStatus").textContent=`Optimaliseren… proef ${i+1} van ${all.length}`;
+  };
   for(let i=0;i<all.length;i++){
-    const res=placeSequence(all[i],rollW,kerf);
+    updateProgress(i);
+    const res=await placeSequence(all[i],rollW,kerf,()=>updateProgress(i));
     if(res&&(!best||res.totalLen<best.totalLen-EPS))best=res;
-    if(i%10===0){$("#progressBar").style.width=`${Math.round((i+1)/all.length*100)}%`;$("#planStatus").textContent=`Optimaliseren… proef ${i+1} van ${all.length}`;await new Promise(r=>setTimeout(r,0))}
+    // Eén browsermoment per volledige proef is voldoende.
+    if((i & 7)===7) await new Promise(requestAnimationFrame);
   }
-  $("#progressBar").style.width="100%";return best;
+  $("#progressBar").style.width="100%";
+  return best;
 }
 function planStats(res,rollW,rollL){
   const net=res.placed.reduce((s,p)=>s+p.item.netW*p.item.netH,0),gross=res.placed.reduce((s,p)=>s+p.w*p.h,0),roll=rollW*res.totalLen,waste=Math.max(0,roll-gross);
@@ -429,8 +460,10 @@ function renderPlan(res,rollW,rollL,kerf,splitNotices=[]){
   calculatePrices();
 }
 $("#calculatePlan").onclick=async()=>{
-  const rollW=num($("#rollW").value),rollL=num($("#rollL").value),kerf=Math.max(0,num($("#kerf").value)||0),{items,errors,splitNotices}=readItems(rollW);
-  if(errors.length)return alert(errors.join("\n"));if(!(rollW>0&&rollL>0))return alert("Voer geldige rolmaten in.");
+  const rollW=num($("#rollW").value),rollL=num($("#rollL").value),kerf=Math.max(0,num($("#kerf").value)||0);
+  if(!(rollW>0&&rollL>0))return alert("Voer geldige rolmaten in.");
+  const {items,errors,splitNotices}=readItems(rollW);
+  if(errors.length)return alert(errors.join("\n"));
   $("#calculatePlan").disabled=true;$("#progressBar").style.width="0%";
   try{const res=await optimize(items,rollW,kerf,parseInt($("#quality").value,10));if(!res)return alert("Geen geldige indeling gevonden.");renderPlan(res,rollW,rollL,kerf,splitNotices)}
   finally{$("#calculatePlan").disabled=false}
@@ -440,9 +473,10 @@ async function calculateAndProceed(){
   const plannerNextBtn=$('#plannerNext');
   if(!plannerNextBtn)return;
   if(lastPlan){activatePage('calc');return;}
-  const rollW=num($("#rollW").value),rollL=num($("#rollL").value),kerf=Math.max(0,num($("#kerf").value)||0),{items,errors,splitNotices}=readItems(rollW);
-  if(errors.length)return alert(errors.join("\n"));
+  const rollW=num($("#rollW").value),rollL=num($("#rollL").value),kerf=Math.max(0,num($("#kerf").value)||0);
   if(!(rollW>0&&rollL>0))return alert("Voer geldige rolmaten in.");
+  const {items,errors,splitNotices}=readItems(rollW);
+  if(errors.length)return alert(errors.join("\n"));
   const origText=plannerNextBtn.textContent;
   plannerNextBtn.disabled=true;plannerNextBtn.textContent='Berekenen…';
   $("#progressBar").style.width="0%";
@@ -747,8 +781,80 @@ function buildPlanPDF(){
 }
 function planPDF(){
   if(!lastPlan)return alert("Maak eerst een snijplan.");
-  const doc=buildPlanPDF();if(!doc)return;
-  doc.save(`${safe(lastPlan.project)}_snijplan.pdf`);
+  const r=lastPlan;
+
+  // Productie-PDF voor Zünd: één doorlopende pagina op ware grootte (100%).
+  // Alleen de contouren van de snijstukken worden getekend; er is géén buitencontour van de rol.
+  // De contouren gebruiken een Separation/spot color met de exacte naam CutContour.
+  // De PDF bevat daarnaast een Optional Content Group (laag) met de naam CutContour.
+  // Het stuknummer staat als zwarte tekst in de snijrand en valt binnen dezelfde PDF-laag,
+  // maar gebruikt bewust NIET de CutContour-steunkleur zodat de snijmachine de letters niet als snijlijn ziet.
+
+  const MM_TO_PT=72/25.4;
+  const physicalWpt=r.rollW*MM_TO_PT;
+  const physicalHpt=Math.max(1,r.totalLen)*MM_TO_PT;
+  // Houd de PDF user-space binnen ca. 14.000 pt voor compatibiliteit met grote pagina's.
+  // /UserUnit zorgt dat de uiteindelijke fysieke maat toch exact 100% blijft.
+  const userUnit=Math.max(1,physicalWpt/14000,physicalHpt/14000);
+  const pageW=physicalWpt/userUnit,pageH=physicalHpt/userUnit;
+  const ptPerMm=MM_TO_PT/userUnit;
+
+  const n=v=>Number(v).toFixed(4).replace(/0+$/,'').replace(/\.$/,'');
+  const pdfEsc=t=>String(t).replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)");
+  const labelFor=p=>p.item.label; // uitsluitend raam-/stuknummer, geen maatvoering
+
+  let content="/OC /CUT BDC\n";
+  // CutContour als spot color. Tint 1 = volle steunkleur; alternate CMYK = 0/100/0/0 (magenta preview).
+  content+="/CSCUT CS 1 SCN\n";
+  // Haarlijn/vectorcontour; de Zünd/RIP gebruikt de CutContour-spotkleur als snijlijn.
+  content+="0 w 0 J 0 j\n";
+  [...r.placed].sort((a,b)=>a.y-b.y||a.x-b.x).forEach(p=>{
+    const x=p.x*ptPerMm;
+    const y=pageH-(p.y+p.h)*ptPerMm;
+    const w=p.w*ptPerMm,h=p.h*ptPerMm;
+    content+=`${n(x)} ${n(y)} ${n(w)} ${n(h)} re S\n`;
+  });
+
+  // Kenmerken in de snijrand: zwart, dus zichtbaar voor de plakker maar geen CutContour-snijpad.
+  content+="0 G /F1 "+n(10/userUnit)+" Tf\n";
+  [...r.placed].sort((a,b)=>a.y-b.y||a.x-b.x).forEach(p=>{
+    const margin=Math.max(0,Number(p.item.margin)||0);
+    // Plaats in de bovenste snijrand. Bij een zeer kleine snijrand blijft het kenmerk net binnen het stuk.
+    const insetX=Math.min(Math.max(3,margin*0.18),Math.max(3,p.w/4));
+    const insetY=Math.min(Math.max(3,margin*0.22),Math.max(3,p.h/4));
+    const tx=(p.x+insetX)*ptPerMm;
+    const ty=pageH-(p.y+insetY)*ptPerMm;
+    content+=`BT ${n(tx)} ${n(ty)} Td (${pdfEsc(labelFor(p))}) Tj ET\n`;
+  });
+  content+="EMC\n";
+
+  const enc=new TextEncoder();
+  const streamBytes=enc.encode(content);
+  const objects=[];
+  const add=x=>{objects.push(x);return objects.length};
+  const catalog=add("");
+  const pages=add("");
+  const page=add("");
+  const stream=add(`<< /Length ${streamBytes.length} >>\nstream\n${content}endstream`);
+  const font=add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  const sep=add("[/Separation /CutContour /DeviceCMYK << /FunctionType 2 /Domain [0 1] /C0 [0 0 0 0] /C1 [0 1 0 0] /N 1 >>]");
+  const ocg=add("<< /Type /OCG /Name (CutContour) >>");
+  objects[catalog-1]=`<< /Type /Catalog /Pages ${pages} 0 R /OCProperties << /OCGs [${ocg} 0 R] /D << /Order [${ocg} 0 R] /ON [${ocg} 0 R] >> >> >>`;
+  objects[pages-1]=`<< /Type /Pages /Kids [${page} 0 R] /Count 1 >>`;
+  objects[page-1]=`<< /Type /Page /Parent ${pages} 0 R /MediaBox [0 0 ${n(pageW)} ${n(pageH)}] /UserUnit ${n(userUnit)} /Resources << /Font << /F1 ${font} 0 R >> /ColorSpace << /CSCUT ${sep} 0 R >> /Properties << /CUT ${ocg} 0 R >> >> /Contents ${stream} 0 R >>`;
+
+  let pdf="%PDF-1.6\n%GlassNext CutContour production PDF\n";
+  const offsets=[0];
+  for(let i=0;i<objects.length;i++){
+    offsets.push(enc.encode(pdf).length);
+    pdf+=`${i+1} 0 obj\n${objects[i]}\nendobj\n`;
+  }
+  const xref=enc.encode(pdf).length;
+  pdf+=`xref\n0 ${objects.length+1}\n0000000000 65535 f \n`;
+  for(let i=1;i<=objects.length;i++)pdf+=String(offsets[i]).padStart(10,"0")+" 00000 n \n";
+  pdf+=`trailer\n<< /Size ${objects.length+1} /Root ${catalog} 0 R >>\nstartxref\n${xref}\n%%EOF`;
+
+  downloadBlob(new Blob([enc.encode(pdf)],{type:"application/pdf"}),`${safe(r.project)}_CutContour_100pct.pdf`);
 }
 function generatePlanPDFBase64(){
   const doc=buildPlanPDF();
@@ -813,7 +919,7 @@ function collectProject(){
     }))
   }:null;
   console.log('[GN] collectProject planData=', planData?{placed:planData.placed.length,rollW:planData.rollW,totalLen:planData.totalLen}:null);
-  return{version:"GlassNext Suite v5.1-WP",savedAt:new Date().toISOString(),values,panes,otherCosts:readOtherCosts(),workorderData,exportData,planData};
+  return{version:"GlassNext Suite v5.2-WP",savedAt:new Date().toISOString(),values,panes,otherCosts:readOtherCosts(),workorderData,exportData,planData};
 }
 function renderWorkorderHTML(){
   if(!lastPlan)return"";
@@ -834,10 +940,11 @@ async function submitOffer(){
   const p=projectData();
   if(flowMode!=="measure"&&!lastPlan){
     console.log('[GN] No lastPlan, generating...');
-    const rollW=num($("#rollW").value),rollL=num($("#rollL").value),kerf=Math.max(0,num($("#kerf").value)||0),{items,errors,splitNotices}=readItems(rollW);
+    const rollW=num($("#rollW").value),rollL=num($("#rollL").value),kerf=Math.max(0,num($("#kerf").value)||0);
+    if(!(rollW>0&&rollL>0))return alert("Voer geldige rolmaten in.");
+    const {items,errors,splitNotices}=readItems(rollW);
     console.log('[GN] rollW=', rollW, 'rollL=', rollL, 'items=', items.length, 'errors=', errors);
     if(errors.length)return alert(errors.join("\n"));
-    if(!(rollW>0&&rollL>0))return alert("Voer geldige rolmaten in.");
     const btn0=$("#submitOffer");if(btn0){btn0.disabled=true;btn0.textContent="Berekenen…";}
     try{
       const res=await optimize(items,rollW,kerf,parseInt($("#quality").value,10));
