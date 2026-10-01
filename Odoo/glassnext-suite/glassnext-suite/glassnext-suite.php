@@ -2,20 +2,21 @@
 /**
  * Plugin Name: GlassNext Suite
  * Description: Klant-facing tool voor snijplanner, calculatie, ROI en offerte aanvraag.
- * Version: 1.8.8
+ * Version: 1.9.0
  * Author: GlassNext
  * Text Domain: glassnext-suite
  */
 
 if (!defined('ABSPATH')) exit;
 
-define('GN_VERSION', '1.8.8');
+define('GN_VERSION', '1.9.0');
 define('GN_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('GN_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('GN_PLUGIN_BASENAME', plugin_basename(__FILE__));
 
 require_once GN_PLUGIN_DIR . 'includes/class-gn-options.php';
 require_once GN_PLUGIN_DIR . 'includes/class-gn-odoo.php';
+require_once GN_PLUGIN_DIR . 'includes/class-gn-newsletter.php';
 require_once GN_PLUGIN_DIR . 'includes/class-gn-submissions.php';
 require_once GN_PLUGIN_DIR . 'includes/class-gn-email.php';
 require_once GN_PLUGIN_DIR . 'includes/class-gn-admin-columns.php';
@@ -25,10 +26,12 @@ class GlassNext_Suite {
     public function __construct() {
         GN_Options::instance();
         GN_Odoo::instance();
+        GN_Newsletter::instance();
         GN_Submissions::instance();
         GN_Email::instance();
 
         add_action('init', [$this, 'init']);
+        add_action('elementor/widgets/register', [$this, 'register_elementor_widgets']);
         add_action('wp_enqueue_scripts', [$this, 'register_assets']);
         add_shortcode('glassnext_suite', [$this, 'shortcode_render']);
         add_filter('theme_page_templates', [$this, 'register_page_template']);
@@ -37,6 +40,11 @@ class GlassNext_Suite {
 
     public function init() {
         // Extra init acties kunnen hier worden toegevoegd.
+    }
+
+    public function register_elementor_widgets($widgets_manager) {
+        require_once GN_PLUGIN_DIR . 'includes/class-gn-elementor-newsletter.php';
+        $widgets_manager->register(new GN_Elementor_Newsletter_Widget());
     }
 
     public function register_assets() {

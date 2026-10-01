@@ -1,0 +1,147 @@
+/* GlassNext Nieuwsbrief — basis-styles.
+   De Elementor-widget stylt verder via controls; dit is de fallback/Default look. */
+
+.gn-newsletter {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+.gn-newsletter__title {
+  margin: 0 0 8px;
+  font-size: 1.4em;
+  line-height: 1.3;
+}
+
+.gn-newsletter__desc {
+  margin: 0 0 16px;
+  font-size: 0.95em;
+  line-height: 1.5;
+}
+
+.gn-newsletter__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Inline-layout: velden naast elkaar op desktop, gestapeld op mobiel */
+.gn-newsletter--inline .gn-newsletter__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.gn-newsletter--inline .gn-newsletter__fields {
+  flex: 1 1 260px;
+  flex-direction: row;
+  display: flex;
+}
+.gn-newsletter--inline .gn-newsletter__input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.gn-newsletter--inline .gn-newsletter__consent {
+  flex-basis: 100%;
+}
+.gn-newsletter--inline .gn-newsletter__button {
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .gn-newsletter--inline .gn-newsletter__fields {
+    flex-direction: column;
+    flex-basis: 100%;
+  }
+  .gn-newsletter--inline .gn-newsletter__button {
+    width: 100%;
+  }
+}
+
+.gn-newsletter__input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 16px; /* voorkomt iOS auto-zoom */
+  line-height: 1.4;
+  border: 1px solid #ccd0d4;
+  border-radius: 4px;
+  background: #fff;
+  color: inherit;
+  box-sizing: border-box;
+}
+
+.gn-newsletter__input:focus {
+  outline: none;
+  border-color: #2271b1;
+  box-shadow: 0 0 0 1px #2271b1;
+}
+
+/* Honeypot: nooit zichtbaar voor mensen */
+.gn-newsletter__hp {
+  position: absolute !important;
+  left: -9999px !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+}
+
+.gn-newsletter__consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 0.85em;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.gn-newsletter__consent input[type="checkbox"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.gn-newsletter__recaptcha {
+  margin-top: 12px;
+}
+
+.gn-newsletter__button {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 12px 28px;
+  font-size: 1em;
+  font-weight: 600;
+  line-height: 1.4;
+  border: none;
+  border-radius: 4px;
+  background: #2271b1;
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.gn-newsletter__button:hover {
+  background: #135e96;
+}
+
+.gn-newsletter__button:disabled,
+.gn-newsletter__button.is-loading {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.gn-newsletter__message {
+  margin-top: 10px;
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+
+.gn-newsletter__message.is-success {
+  color: #0a7c42;
+}
+
+.gn-newsletter__message.is-error {
+  color: #c0392b;
+}
+
+/* Verberg het reCAPTCHA v3 badge niet voorbidden — Google vereist attribution.
+   Indien gewenst kan de site-eigenaar dit stylen; wij verbergen niets standaard. */

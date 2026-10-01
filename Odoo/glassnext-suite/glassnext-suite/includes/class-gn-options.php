@@ -109,6 +109,20 @@ class GN_Options {
 
             // Thank you page
             'gn_thankyou_url' => '',
+
+            // Nieuwsbrief (Odoo mailinglijst + Elementor widget)
+            'gn_newsletter_enabled'       => '',
+            'gn_newsletter_list_ids'      => '',
+            'gn_newsletter_consent_text'  => 'Ik meld me aan voor de nieuwsbrief en ga akkoord met de privacyverklaring: {{privacy_url}}',
+            'gn_newsletter_privacy_url'   => '',
+            'gn_newsletter_success_msg'   => 'Bedankt! Je bent ingeschreven voor de nieuwsbrief.',
+            'gn_newsletter_error_msg'     => 'Er ging iets mis bij het inschrijven. Probeer het later opnieuw.',
+
+            // reCAPTCHA (nieuwsbrief) — leeg = keys uit Elementor Pro gebruiken
+            'gn_recaptcha_version'    => 'auto',
+            'gn_recaptcha_site_key'   => '',
+            'gn_recaptcha_secret_key' => '',
+            'gn_recaptcha_score'      => '0.5',
         ];
     }
 
@@ -175,6 +189,10 @@ class GN_Options {
             'gn_tooltip_rotatie_text', 'gn_tooltip_rotatie_image',
             'gn_tooltip_ruimte_text', 'gn_tooltip_ruimte_image',
             'gn_thankyou_url',
+            'gn_newsletter_enabled', 'gn_newsletter_list_ids',
+            'gn_newsletter_consent_text', 'gn_newsletter_privacy_url',
+            'gn_newsletter_success_msg', 'gn_newsletter_error_msg',
+            'gn_recaptcha_version', 'gn_recaptcha_site_key', 'gn_recaptcha_secret_key', 'gn_recaptcha_score',
         ];
 
         foreach ($groups as $key) {
@@ -195,6 +213,7 @@ class GN_Options {
             <button type="button" class="gn-tab-link" data-tab="tooltips">Snijplanner tooltips</button>
             <button type="button" class="gn-tab-link" data-tab="email">E-mail</button>
             <button type="button" class="gn-tab-link" data-tab="odoo">Odoo / Make.com</button>
+            <button type="button" class="gn-tab-link" data-tab="newsletter">Nieuwsbrief</button>
         </nav>
             <form method="post" action="options.php">
                 <?php settings_fields('glassnext_settings_group'); ?>
@@ -433,6 +452,112 @@ class GN_Options {
                 </table>
 
                 </div>
+
+                <div class="gn-tab-panel" data-tab="newsletter">
+                <h2 class="title">Nieuwsbrief-inschrijving (Odoo + Elementor)</h2>
+                <p class="description" style="margin-bottom:15px">Hiermee verschijnt de widget <strong>GlassNext Nieuwsbrief</strong> in de Elementor-editor. Bezoekers schrijven zich in op een Odoo-mailinglijst (E-mailmarketing). De Odoo-koppeling hieronder gebruikt dezelfde inloggegevens als op de tab <em>Odoo / Make.com</em>.</p>
+                <table class="form-table">
+                    <tr><th><label for="gn_newsletter_enabled">Nieuwsbrief actief</label></th><td>
+                        <label><input type="checkbox" id="gn_newsletter_enabled" name="gn_newsletter_enabled" value="1" <?php checked(get_option('gn_newsletter_enabled', ''), '1'); ?>> Inschrijfformulier en widget inschakelen.</label>
+                    </td></tr>
+                    <tr><th><label for="gn_newsletter_list_ids">Mailinglijst(en)</label></th><td>
+                        <input type="text" id="gn_newsletter_list_ids" name="gn_newsletter_list_ids" value="<?php echo esc_attr(get_option('gn_newsletter_list_ids', '')); ?>" class="regular-text" placeholder="bijv. 2 of 2,5">
+                        <p class="description">Komma-gescheiden ID's van <code>mailing.list</code> in Odoo. Gebruik de knop hieronder om de lijsten op te halen — het ID staat ook in de URL als je een lijst opent in Odoo.</p>
+                        <div style="margin-top:8px;">
+                            <button type="button" class="button" id="gn-fetch-mailing-lists">Lijsten ophalen uit Odoo</button>
+                            <span id="gn-fetch-lists-spinner" class="spinner" style="float:none;"></span>
+                        </div>
+                        <div id="gn-mailing-lists-result" style="margin-top:10px;"></div>
+                    </td></tr>
+                </table>
+
+                <h2 class="title">Formulierteksten</h2>
+                <table class="form-table">
+                    <tr><th><label for="gn_newsletter_consent_text">Toestemmingstekst (opt-in checkbox)</label></th><td>
+                        <textarea id="gn_newsletter_consent_text" name="gn_newsletter_consent_text" rows="3" class="large-text"><?php echo esc_textarea(get_option('gn_newsletter_consent_text', 'Ik meld me aan voor de nieuwsbrief en ga akkoord met de privacyverklaring: {{privacy_url}}')); ?></textarea>
+                        <p class="description">Gebruik <code>{{privacy_url}}</code> als placeholder voor de privacylink. Deze tekst is ook zichtbaar als label bij de checkbox; de widget kan dit per instantie overschrijven.</p>
+                    </td></tr>
+                    <tr><th><label for="gn_newsletter_privacy_url">Privacyverklaring URL</label></th><td><input type="url" id="gn_newsletter_privacy_url" name="gn_newsletter_privacy_url" value="<?php echo esc_attr(get_option('gn_newsletter_privacy_url', '')); ?>" class="regular-text" placeholder="https://voorbeeld.nl/privacyverklaring"></td></tr>
+                    <tr><th><label for="gn_newsletter_success_msg">Succesmelding</label></th><td><input type="text" id="gn_newsletter_success_msg" name="gn_newsletter_success_msg" value="<?php echo esc_attr(get_option('gn_newsletter_success_msg', 'Bedankt! Je bent ingeschreven voor de nieuwsbrief.')); ?>" class="regular-text"></td></tr>
+                    <tr><th><label for="gn_newsletter_error_msg">Foutmelding</label></th><td><input type="text" id="gn_newsletter_error_msg" name="gn_newsletter_error_msg" value="<?php echo esc_attr(get_option('gn_newsletter_error_msg', 'Er ging iets mis bij het inschrijven. Probeer het later opnieuw.')); ?>" class="regular-text"></td></tr>
+                </table>
+
+                <h2 class="title">reCAPTCHA (spambeveiliging)</h2>
+                <table class="form-table">
+                    <tr><th>Gedetecteerde keys</th><td>
+                        <?php
+                        $own_site   = get_option('gn_recaptcha_site_key', '');
+                        $own_secret = get_option('gn_recaptcha_secret_key', '');
+                        $el_v3      = get_option('elementor_pro_recaptcha_v3_site_key', '') && get_option('elementor_pro_recaptcha_v3_secret_key', '');
+                        $el_v2      = get_option('elementor_pro_recaptcha_site_key', '') && get_option('elementor_pro_recaptcha_secret_key', '');
+                        if ($own_site && $own_secret) {
+                            echo '<span style="color:#087f5b;font-weight:600;">Eigen keys hieronder worden gebruikt.</span>';
+                        } elseif ($el_v3) {
+                            echo '<span style="color:#087f5b;font-weight:600;">reCAPTCHA v3-keys uit Elementor Pro worden gebruikt.</span>';
+                        } elseif ($el_v2) {
+                            echo '<span style="color:#b47b00;font-weight:600;">reCAPTCHA v2-keys uit Elementor Pro worden gebruikt.</span>';
+                        } else {
+                            echo '<span style="color:#c0392b;font-weight:600;">Geen reCAPTCHA-keys gevonden.</span> Vul hieronder eigen keys in of configureer reCAPTCHA in Elementor (Instellingen &gt; Integraties). Zonder keys draait alleen de honeypot-beveiliging.';
+                        }
+                        ?>
+                    </td></tr>
+                    <tr><th><label for="gn_recaptcha_version">reCAPTCHA versie</label></th><td>
+                        <select id="gn_recaptcha_version" name="gn_recaptcha_version">
+                            <?php $rc_version = get_option('gn_recaptcha_version', 'auto'); ?>
+                            <option value="auto" <?php selected($rc_version, 'auto'); ?>>Automatisch (aanbevolen)</option>
+                            <option value="v3" <?php selected($rc_version, 'v3'); ?>>v3 (onzichtbaar, score)</option>
+                            <option value="v2_checkbox" <?php selected($rc_version, 'v2_checkbox'); ?>>v2 checkbox</option>
+                            <option value="v2_invisible" <?php selected($rc_version, 'v2_invisible'); ?>>v2 onzichtbaar</option>
+                            <option value="off" <?php selected($rc_version, 'off'); ?>>Uit (alleen honeypot)</option>
+                        </select>
+                        <p class="description">"Automatisch" gebruikt v3 als die keys beschikbaar zijn (zoals nu op de site ingesteld), anders v2.</p>
+                    </td></tr>
+                    <tr><th><label for="gn_recaptcha_site_key">Eigen site key (optioneel)</label></th><td><input type="text" id="gn_recaptcha_site_key" name="gn_recaptcha_site_key" value="<?php echo esc_attr(get_option('gn_recaptcha_site_key', '')); ?>" class="regular-text"><p class="description">Leeg = keys uit Elementor Pro gebruiken. Vul alleen in als de site reCAPTCHA via een andere plugin gebruikt.</p></td></tr>
+                    <tr><th><label for="gn_recaptcha_secret_key">Eigen secret key (optioneel)</label></th><td><input type="password" id="gn_recaptcha_secret_key" name="gn_recaptcha_secret_key" value="<?php echo esc_attr(get_option('gn_recaptcha_secret_key', '')); ?>" class="regular-text" autocomplete="new-password"></td></tr>
+                    <tr><th><label for="gn_recaptcha_score">v3 score-drempel</label></th><td><input type="number" step="0.05" min="0" max="1" id="gn_recaptcha_score" name="gn_recaptcha_score" value="<?php echo esc_attr(get_option('gn_recaptcha_score', '0.5')); ?>" class="small-text"><p class="description">Scores lager dan dit worden geweigerd (0.0 = bot, 1.0 = zeer waarschijnlijk mens). Standaard 0.5.</p></td></tr>
+                </table>
+                <p class="description">De widget staat in Elementor onder categorie <em>General</em> als <strong>GlassNext Nieuwsbrief</strong>. Alle teksten, velden en styling zijn per widget instelbaar.</p>
+
+                </div>
+
+                <script>
+                (function($){
+                    $('#gn-fetch-mailing-lists').on('click', function(){
+                        var $btn = $(this), $spinner = $('#gn-fetch-lists-spinner'), $result = $('#gn-mailing-lists-result');
+                        $btn.prop('disabled', true);
+                        $spinner.addClass('is-active');
+                        $result.html('');
+                        $.post(ajaxurl, {
+                            action: 'gn_fetch_mailing_lists',
+                            nonce: '<?php echo esc_js(wp_create_nonce('gn_fetch_mailing_lists')); ?>'
+                        }).done(function(res){
+                            if (res.success && res.lists && res.lists.length) {
+                                var current = ($('#gn_newsletter_list_ids').val() || '').split(',').map(function(s){return s.trim();});
+                                var html = '<p style="margin-bottom:6px;"><strong>' + res.lists.length + ' mailinglijst(en) gevonden:</strong></p>';
+                                res.lists.forEach(function(list){
+                                    var checked = current.indexOf(String(list.id)) !== -1 ? ' checked' : '';
+                                    html += '<label style="display:block;margin-bottom:4px;"><input type="checkbox" class="gn-ml-check" value="' + list.id + '"' + checked + '> ' + $('<span>').text(list.name).html() + ' <code>(ID ' + list.id + ')</code>' + (list.is_public ? '' : ' <em>niet-publiek</em>') + '</label>';
+                                });
+                                html += '<button type="button" class="button button-small" id="gn-ml-apply">Selectie toepassen</button>';
+                                $result.html(html);
+                            } else if (res.success) {
+                                $result.html('<p>Verbinding OK, maar geen mailinglijsten gevonden. Maak eerst een lijst aan in Odoo (E-mailmarketing).</p>');
+                            } else {
+                                $result.html('<p style="color:#c0392b;"><strong>Fout:</strong> ' + (res.error || res.message || 'Onbekende fout') + '</p><p class="description">Controleer de Odoo-koppeling op de tab "Odoo / Make.com" en of de app E-mailmarketing is geïnstalleerd.</p>');
+                            }
+                        }).fail(function(xhr){
+                            $result.html('<p style="color:#c0392b;">AJAX-fout: ' + xhr.status + '</p>');
+                        }).always(function(){
+                            $btn.prop('disabled', false);
+                            $spinner.removeClass('is-active');
+                        });
+                    });
+                    $('#gn-mailing-lists-result').on('click', '#gn-ml-apply', function(){
+                        var ids = $('.gn-ml-check:checked').map(function(){ return $(this).val(); }).get();
+                        $('#gn_newsletter_list_ids').val(ids.join(','));
+                    });
+                })(jQuery);
+                </script>
 
                 <script>
                 (function($){

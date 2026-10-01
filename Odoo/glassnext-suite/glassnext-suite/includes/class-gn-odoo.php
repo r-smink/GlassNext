@@ -22,6 +22,19 @@ class GN_Odoo {
 
     private function __construct() {
         add_action('wp_ajax_gn_test_odoo_connection', [$this, 'ajax_test_connection']);
+        add_action('wp_ajax_gn_fetch_mailing_lists', [$this, 'ajax_fetch_mailing_lists']);
+    }
+
+    /**
+     * Admin AJAX: haalt de beschikbare mailinglijsten op uit Odoo voor de
+     * nieuwsbrief-instellingentab.
+     */
+    public function ajax_fetch_mailing_lists() {
+        check_ajax_referer('gn_fetch_mailing_lists', 'nonce');
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'Geen toegang.']);
+        }
+        wp_send_json($this->fetch_mailing_lists());
     }
 
     public function ajax_test_connection() {
@@ -53,6 +66,19 @@ class GN_Odoo {
             && get_option('gn_odoo_db', '')
             && (get_option('gn_odoo_login', '') || $has_uid)
             && get_option('gn_odoo_api_key', '');
+    }
+
+    /**
+     * Publieke check of de Odoo-koppeling voldoende geconfigureerd is.
+     * De nieuwsbrief-inschrijving gebruikt dit los van gn_odoo_enabled,
+     * zodat de koppeling ook werkt als alleen de nieuwsbrief-feature aan staat.
+     */
+    public function is_configured() {
+        $has_uid = (int) get_option('gn_odoo_uid', 0) > 0;
+        return (bool) (get_option('gn_odoo_url', '')
+            && get_option('gn_odoo_db', '')
+            && (get_option('gn_odoo_login', '') || $has_uid)
+            && get_option('gn_odoo_api_key', ''));
     }
 
     /**
@@ -1066,5 +1092,167 @@ class GN_Odoo {
             'product_uom_qty' => $qty,
             'price_unit'      => $price_unit,
         ]]);
+    }
+
+    /**
+     * Haalt de beschikbare mailinglijsten op uit Odoo (mass_mailing / mailing.list).
+     * Geeft altijd een array terug met success + lijsten, gooit nooit een fout.
+     *
+     * @return array{success:bool, lists:array, error:?string}
+     */
+    public function fetch_mailing_lists() {
+        if (!$this->is_configured()) {
+            return ['success' => false, 'lists' => [], 'error' => 'Odoo-koppeling niet geconfigureerd.'];
+        }
+
+        try {
+            $this->authenticate();
+            $lists = $this->call('mailing.list', 'search_read', [
+                [],
+            ], ['fields' => ['id', 'name', 'is_public'], 'order' => 'name asc']);
+
+            if (!is_array($lists)) {
+                return ['success' => false, 'lists' => [], 'error' => 'mailing.list gaf geen geldig resultaat terug.'];
+            }
+
+            $this->debug_log('fetch_mailing_lists: ' . count($lists) . ' lijst(en) gevonden');
+            return ['success' => true, 'lists' => $lists, 'error' => null];
+        } catch (Exception $e) {
+            $this->debug_log('fetch_mailing_lists error: ' . $e->getMessage());
+            return ['success' => false, 'lists' => [], 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Schrijft een e-mailadres in op één of meerdere Odoo-mailinglijsten.
+     * Maakt het mailing.contact aan als het nog niet bestaat, en legt de
+     * toestemming (opt-in) vast als notitie in de chatter van het contact.
+     * Geeft altijd een array terug, gooit nooit een fout naar buiten.
+     *
+     * @param string $email
+     * @param string $name
+     * @param int[]  $list_ids
+     * @param array  $consent_meta  ['ip'=>string,'text'=>string,'page'=>string,'time'=>string]
+     * @return array{success:bool, contact_id:?int, error:?string}
+     */
+    public function subscribe_to_mailing_list($email, $name, $list_ids, $consent_meta = []) {
+        if (!$this->is_configured()) {
+            return ['success' => false, 'contact_id' => null, 'error' => 'Odoo-koppeling niet geconfigureerd.'];
+        }
+        if (empty($list_ids) || !is_array($list_ids)) {
+            return ['success' => false, 'contact_id' => null, 'error' => 'Geen mailinglijst geconfigureerd.'];
+        }
+
+        try {
+            $this->authenticate();
+            $this->debug_log('subscribe start: email=' . $email . ' lists=' . implode(',', $list_ids));
+
+            $contact_id = $this->find_or_create_mailing_contact($email, $name);
+            $this->debug_log('mailing.contact id=' . $contact_id);
+
+            foreach ($list_ids as $list_id) {
+                $list_id = (int) $list_id;
+                if ($list_id <= 0) continue;
+                $this->subscribe_contact_to_list($contact_id, $list_id);
+            }
+
+            $this->log_consent_to_chatter($contact_id, $email, $name, $list_ids, $consent_meta);
+
+            $this->debug_log('subscribe complete: contact_id=' . $contact_id);
+            return ['success' => true, 'contact_id' => $contact_id, 'error' => null];
+        } catch (Exception $e) {
+            $this->debug_log('subscribe error: ' . $e->getMessage());
+            return ['success' => false, 'contact_id' => null, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Zoekt een mailing.contact op e-mailadres of maakt het aan.
+     */
+    private function find_or_create_mailing_contact($email, $name) {
+        // Odoo houdt email_normalized bij (kleine letters, getrimd) — veld bestaat vanaf Odoo 15
+        $normalized = strtolower(trim($email));
+        try {
+            $found = $this->call('mailing.contact', 'search_read', [
+                [['email_normalized', '=', $normalized]],
+            ], ['fields' => ['id', 'name', 'email'], 'limit' => 1]);
+            if (!empty($found) && isset($found[0]['id'])) {
+                return (int) $found[0]['id'];
+            }
+        } catch (Exception $e) {
+            $this->debug_log('email_normalized search failed, fallback op email ilike: ' . $e->getMessage());
+        }
+
+        // Fallback: niet-genormaliseerd zoeken voor oudere Odoo-versies
+        $found = $this->call('mailing.contact', 'search_read', [
+            [['email', '=ilike', $email]],
+        ], ['fields' => ['id', 'name', 'email'], 'limit' => 1]);
+
+        if (!empty($found) && isset($found[0]['id'])) {
+            return (int) $found[0]['id'];
+        }
+
+        $new_id = $this->call('mailing.contact', 'create', [[
+            'name'  => $name ?: $email,
+            'email' => $email,
+        ]]);
+        if (!$new_id) {
+            throw new Exception('mailing.contact create retourneerde geen geldig ID: ' . var_export($new_id, true));
+        }
+        return (int) $new_id;
+    }
+
+    /**
+     * Koppelt een mailing.contact aan een mailing.list via
+     * mailing.contact.subscription. Zet opt_out terug op False bij
+     * her-inschrijving. Valt terug op list_ids M2M als het
+     * subscription-model niet bestaat.
+     */
+    private function subscribe_contact_to_list($contact_id, $list_id) {
+        try {
+            $existing = $this->call('mailing.contact.subscription', 'search', [
+                [['contact_id', '=', $contact_id], ['list_id', '=', $list_id]],
+            ]);
+
+            if (!empty($existing) && isset($existing[0])) {
+                $this->call('mailing.contact.subscription', 'write', [
+                    [(int) $existing[0]],
+                    ['opt_out' => false],
+                ]);
+                $this->debug_log('subscription ' . (int) $existing[0] . ' opt_out=false (her-inschrijving)');
+            } else {
+                $sub_id = $this->call('mailing.contact.subscription', 'create', [[
+                    'contact_id' => $contact_id,
+                    'list_id'    => $list_id,
+                    'opt_out'    => false,
+                ]]);
+                $this->debug_log('subscription created: ' . var_export($sub_id, true));
+            }
+        } catch (Exception $e) {
+            // Oudere Odoo-versies zonder subscription-model: direct via list_ids
+            $this->debug_log('subscription model failed, fallback list_ids: ' . $e->getMessage());
+            $this->call('mailing.contact', 'write', [[$contact_id], ['list_ids' => [[4, $list_id]]]]);
+        }
+    }
+
+    /**
+     * Legt de opt-in toestemming vast als notitie in de chatter van het
+     * mailing.contact (AVG-bewijs: tijdstip, IP, tekst, pagina).
+     */
+    private function log_consent_to_chatter($contact_id, $email, $name, $list_ids, $consent_meta) {
+        $esc = function($v) { return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); };
+
+        $body = '<p><strong>Nieuwsbrief-inschrijving via website</strong></p>';
+        $body .= '<ul style="margin:0 0 0 16px;">';
+        $body .= '<li>E-mail: ' . $esc($email) . '</li>';
+        if ($name) $body .= '<li>Naam: ' . $esc($name) . '</li>';
+        $body .= '<li>Mailinglijst(en): ' . $esc(implode(', ', array_map('intval', $list_ids))) . '</li>';
+        $body .= '<li>Tijdstip: ' . $esc($consent_meta['time'] ?? current_time('mysql')) . '</li>';
+        if (!empty($consent_meta['ip']))   $body .= '<li>IP-adres: ' . $esc($consent_meta['ip']) . '</li>';
+        if (!empty($consent_meta['page'])) $body .= '<li>Pagina: ' . $esc($consent_meta['page']) . '</li>';
+        if (!empty($consent_meta['text'])) $body .= '<li>Toestemmingstekst: <em>' . $esc($consent_meta['text']) . '</em></li>';
+        $body .= '</ul>';
+
+        $this->post_message_to_chatter('mailing.contact', $contact_id, $body);
     }
 }
