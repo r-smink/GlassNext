@@ -54,6 +54,13 @@
 #glassnext-app .page-nav{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
 #glassnext-app .page-nav .btn{min-width:140px;justify-content:center}
 #glassnext-app .page-nav .btn:disabled{opacity:.5;cursor:not-allowed!important}
+#glassnext-app .page-nav .btn.is-disabled{opacity:.5;cursor:not-allowed!important}
+#glassnext-app .field-invalid{border-color:var(--danger)!important;box-shadow:0 0 0 2px rgba(180,35,24,.15)!important}
+#glassnext-app .field-error{color:var(--danger);font-size:12px;font-weight:600;margin-top:4px;line-height:1.35}
+#glassnext-app .error-box{background:#fff5f4;border:1px solid #f1c4bf;border-radius:8px;padding:10px 12px}
+#glassnext-app .consent-label{border-radius:8px;padding:8px;margin-left:-8px;transition:background .2s,box-shadow .2s}
+#glassnext-app .consent-label.consent-missing{background:#fff5f4;box-shadow:0 0 0 2px var(--danger);animation:gn-shake .35s}
+@keyframes gn-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
 #glassnext-app .note{font-size:12px;color:var(--muted);line-height:1.45}
 #glassnext-app .status{font-size:13px;margin:8px 0}
 #glassnext-app .ok{color:var(--ok)}

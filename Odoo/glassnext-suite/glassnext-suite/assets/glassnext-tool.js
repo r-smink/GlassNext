@@ -63,8 +63,45 @@ function activatePage(name){
     if(!ignoreNextHistory){try{history.pushState({page:name},"");}catch(e){}}
     else ignoreNextHistory=false;
     currentPage=name;
+    scrollToApp();
   }
 }
+// Hoogte van een vaste/sticky header (thema of Elementor), zodat de stappenbalk er direct onder komt.
+function headerOffset(){
+  let h=0;
+  document.querySelectorAll("#wpadminbar,header,.elementor-location-header,.elementor-sticky--active,.site-header,#masthead").forEach(el=>{
+    const pos=getComputedStyle(el).position;
+    if(pos!=="fixed"&&pos!=="sticky")return;
+    const r=el.getBoundingClientRect();
+    if(r.top<=1&&r.bottom>h)h=r.bottom;
+  });
+  return h;
+}
+function scrollToApp(){
+  const app=document.getElementById("glassnext-app");
+  if(!app)return;
+  const top=app.getBoundingClientRect().top+window.scrollY-headerOffset()-12;
+  window.scrollTo({top:Math.max(0,top),behavior:"smooth"});
+}
+function scrollToEl(el){
+  if(!el)return;
+  const top=el.getBoundingClientRect().top+window.scrollY-headerOffset()-80;
+  window.scrollTo({top:Math.max(0,top),behavior:"smooth"});
+}
+function setFieldError(el,msg){
+  if(!el)return;
+  el.classList.add("field-invalid");el.setAttribute("aria-invalid","true");
+  const holder=el.parentNode;let m=holder.querySelector(":scope > .field-error");
+  if(!m){m=document.createElement("div");m.className="field-error";holder.appendChild(m)}
+  m.textContent=msg;
+}
+function clearFieldError(el){
+  if(!el)return;
+  el.classList.remove("field-invalid");el.removeAttribute("aria-invalid");
+  el.parentNode.querySelector(":scope > .field-error")?.remove();
+}
+document.addEventListener("input",e=>{if(e.target.classList?.contains("field-invalid"))clearFieldError(e.target)});
+document.addEventListener("change",e=>{if(e.target.classList?.contains("field-invalid"))clearFieldError(e.target)});
 function renderNavButtons(current){
   const vis=visiblePages();
   const idx=vis.indexOf(current);
@@ -80,8 +117,9 @@ function renderNavButtons(current){
     next.disabled=!nextPage;
     if(nextPage)next.dataset.target=nextPage;
     if(current==="offer"&&next.id==="submitOffer"){
-      const cb=$("#offerConsent");
-      next.disabled=!cb||!cb.checked;
+      // Niet echt disabled: dan kan er bij een klik geen melding getoond worden.
+      next.disabled=false;
+      updateSubmitState();
     }
   }
 }
@@ -103,8 +141,7 @@ function setFlowMode(mode){
   const projectTab=$('.tab[data-page="project"]');
   const offerTab=$('.tab[data-page="offer"]');
   const measureDates=$('#measureDates');
-  const projectSubmit=$('#projectSubmit');
-  const submitOfferBtn=$('#submitOffer');
+  const projectSubmit=$('#projectSubmit')||$('#submitMeasure');
 
   if(mode==="measure"){
     if(plannerTab)plannerTab.classList.add('hidden');
@@ -183,32 +220,44 @@ function initTooltips(){
   $$('.tooltip-icon').forEach(icon=>{
     const col=icon.dataset.tooltipCol;
     const data=tooltips[col];
-    if(!data||(!data.text&&!data.img))return;
-    icon.addEventListener('mouseenter',e=>showTooltip(icon,data));
-    icon.addEventListener('mouseleave',()=>hideTooltip());
-    icon.addEventListener('click',e=>{e.preventDefault();toggleTooltip(icon,data)});
+    // Geen inhoud ingesteld: verberg het icoon i.p.v. een knop zonder functie te tonen.
+    if(!data||(!data.text&&!data.img)){icon.style.display='none';return}
+    icon.setAttribute('role','button');icon.setAttribute('tabindex','0');icon.setAttribute('aria-label','Meer informatie');
+    const canHover=window.matchMedia('(hover:hover)').matches;
+    if(canHover){
+      icon.addEventListener('mouseenter',()=>showTooltip(icon,data));
+      icon.addEventListener('mouseleave',()=>{if(!tooltipPinned)hideTooltip()});
+    }
+    icon.addEventListener('click',e=>{
+      e.preventDefault();e.stopPropagation();
+      // Klik zet de tooltip vast (of sluit hem als hij al vastgezet was).
+      if(activeTooltipAnchor===icon&&tooltipPinned){hideTooltip();return}
+      showTooltip(icon,data);tooltipPinned=true;
+    });
+    icon.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();icon.click()}});
   });
+  document.addEventListener('click',e=>{if(activeTooltip&&!activeTooltip.contains(e.target))hideTooltip()});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')hideTooltip()});
+  window.addEventListener('scroll',()=>{if(activeTooltip)hideTooltip()},{passive:true});
 }
-let activeTooltip=null;
+let activeTooltip=null,activeTooltipAnchor=null,tooltipPinned=false;
 function showTooltip(anchor,data){
   hideTooltip();
   const pop=document.createElement('div');
   pop.className='tooltip-popover';
-  pop.innerHTML=(data.img?`<img src="${esc(data.img)}" style="max-width:100%;border-radius:6px;margin-bottom:8px">`:"")+(data.text?`<p>${esc(data.text)}</p>`:"");
-  document.body.appendChild(pop);
+  pop.innerHTML=(data.img?`<img src="${esc(data.img)}" alt="">`:"")+(data.text?`<p>${esc(data.text)}</p>`:"");
+  // Binnen #glassnext-app plaatsen zodat de gescopete CSS van toepassing is.
+  (document.getElementById('glassnext-app')||document.body).appendChild(pop);
   const rect=anchor.getBoundingClientRect();
   pop.style.position='fixed';
   pop.style.top=(rect.bottom+8)+'px';
-  pop.style.left=Math.min(rect.left,window.innerWidth-320)+'px';
-  pop.style.zIndex='9999';
-  activeTooltip=pop;
-}
-function toggleTooltip(anchor,data){
-  if(activeTooltip)hideTooltip();
-  else showTooltip(anchor,data);
+  pop.style.left=Math.max(8,Math.min(rect.left,window.innerWidth-pop.offsetWidth-8))+'px';
+  pop.style.zIndex='99999';
+  activeTooltip=pop;activeTooltipAnchor=anchor;
 }
 function hideTooltip(){
   if(activeTooltip){activeTooltip.remove();activeTooltip=null;}
+  activeTooltipAnchor=null;tooltipPinned=false;
 }
 $$(".tab").forEach(b=>b.onclick=()=>{return false});
 document.addEventListener("click",e=>{
@@ -224,14 +273,33 @@ window.addEventListener("popstate",e=>{
   if(e.state&&e.state.page&&PAGES.includes(e.state.page)){ignoreNextHistory=true;activatePage(e.state.page);}
 });
 const consentCb=$("#offerConsent");
+const offerSubmitBtn=$("#page-offer #submitOffer");
+function updateSubmitState(){
+  if(!offerSubmitBtn)return;
+  const ok=!!consentCb&&consentCb.checked;
+  offerSubmitBtn.classList.toggle("is-disabled",!ok);
+  offerSubmitBtn.setAttribute("aria-disabled",ok?"false":"true");
+}
 if(consentCb){
   consentCb.addEventListener("change",()=>{
-    const sb=$("#submitOffer");
-    if(sb)sb.disabled=!consentCb.checked;
+    updateSubmitState();
+    if(consentCb.checked){
+      $("#offerConsentLabel")?.classList.remove("consent-missing");
+      const st=$("#submitStatus");if(st&&st.dataset.consentMsg){st.innerHTML="";delete st.dataset.consentMsg}
+    }
   });
 }
+updateSubmitState();
 
+// Elke wijziging in de ruitmaten maakt het bestaande snijplan (en daarmee calculatie/ROI) ongeldig,
+// zodat bij "Volgende" altijd opnieuw berekend wordt.
+function invalidatePlan(){
+  lastPlan=null;lastCalc=null;lastROI=null;
+  const box=$("#plannerErrors");if(box){box.style.display="none";box.innerHTML=""}
+}
 const paneBody=$("#paneTable tbody");
+paneBody.addEventListener("input",invalidatePlan);
+paneBody.addEventListener("change",invalidatePlan);
 function addPaneRow(p={}){
   const tr=document.createElement("tr");tr.className="pane-row";
   const i=paneBody.children.length+1;
@@ -247,10 +315,14 @@ function addPaneRow(p={}){
       <div class="pane-cell pane-delete"><button class="btn danger small remove">Verwijder</button></div>
     </div>
   </td>`;
-  tr.querySelector(".remove").onclick=()=>tr.remove();
+  tr.querySelector(".remove").onclick=()=>{
+    tr.remove();invalidatePlan();
+    // Altijd minimaal één (lege) invoerregel tonen.
+    if(!paneBody.children.length)addPaneRow();
+  };
   paneBody.appendChild(tr);
 }
-$("#addPane").onclick=()=>addPaneRow();
+$("#addPane").onclick=()=>{addPaneRow();invalidatePlan()};
 addPaneRow();
 
 function readItems(rollW=null){
@@ -264,7 +336,11 @@ function readItems(rollW=null){
     const count=Math.max(1,parseInt(tr.querySelector(".pn").value||"1",10));
     const canRotate=tr.querySelector(".prot").value==="1";
     const room=tr.querySelector(".proom").value.trim();
-    if(netW<=0||netH<=0){errors.push(`${id}: voer geldige breedte en hoogte in.`);return}
+    const pw=tr.querySelector(".pw"),ph=tr.querySelector(".ph");
+    clearFieldError(pw);clearFieldError(ph);
+    if(netW<=0)setFieldError(pw,"Vul een breedte in cm in.");
+    if(netH<=0)setFieldError(ph,"Vul een hoogte in cm in.");
+    if(netW<=0||netH<=0){errors.push(`${id}: vul een geldige breedte en hoogte in.`);return}
 
     const fullW=netW+2*margin,fullH=netH+2*margin;
 
@@ -474,20 +550,31 @@ async function calculateAndProceed(){
   if(!plannerNextBtn)return;
   if(lastPlan){activatePage('calc');return;}
   const rollW=num($("#rollW").value),rollL=num($("#rollL").value),kerf=Math.max(0,num($("#kerf").value)||0);
-  if(!(rollW>0&&rollL>0))return alert("Voer geldige rolmaten in.");
+  if(!(rollW>0&&rollL>0))return showPlannerErrors(["De rolmaten zijn niet ingesteld. Neem contact met ons op."]);
   const {items,errors,splitNotices}=readItems(rollW);
-  if(errors.length)return alert(errors.join("\n"));
+  if(errors.length)return showPlannerErrors(errors);
+  showPlannerErrors([]);
   const origText=plannerNextBtn.textContent;
   plannerNextBtn.disabled=true;plannerNextBtn.textContent='Berekenen…';
   $("#progressBar").style.width="0%";
   try{
     const res=await optimize(items,rollW,kerf,parseInt($("#quality").value,10));
-    if(!res){plannerNextBtn.disabled=false;plannerNextBtn.textContent=origText;return alert("Geen geldige indeling gevonden.");}
+    if(!res){plannerNextBtn.disabled=false;plannerNextBtn.textContent=origText;return showPlannerErrors(["Er kon geen geldige indeling worden gevonden. Controleer de ingevoerde maten."]);}
     renderPlan(res,rollW,rollL,kerf,splitNotices);
     activatePage('calc');
   }finally{
     plannerNextBtn.disabled=false;plannerNextBtn.textContent=origText;
   }
+}
+function showPlannerErrors(errs){
+  const box=$("#plannerErrors");
+  if(!box){if(errs.length)alert(errs.join("\n"));return}
+  if(!errs.length){box.style.display="none";box.innerHTML="";return}
+  box.innerHTML=`<p style="margin:0 0 6px 0"><b>Controleer de ingevoerde ruitmaten:</b></p>`+errs.map(e=>`<p style="margin:0 0 4px 0">• ${esc(e)}</p>`).join("");
+  box.style.display="block";
+  const firstInvalid=$("#paneTable .field-invalid");
+  scrollToEl(firstInvalid||box);
+  if(firstInvalid)firstInvalid.focus({preventScroll:true});
 }
 
 const MOUNT_DEFAULT_RATES={easy:35,average:45,complex:60,very:75};
@@ -576,17 +663,23 @@ function projectData(){
 function validateProject(){
   const p=projectData();
   const errs=[];
-  if(!p.customerName||!p.customerName.trim()) errs.push("Vul uw klant / organisatie naam in.");
-  if(!p.email||!p.email.trim()) errs.push("Vul uw e-mailadres in.");
-  else if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email.trim())) errs.push("Vul een geldig e-mailadres in.");
-  if(!p.address||!p.address.trim()) errs.push("Vul uw projectadres in.");
-  if(!p.city||!p.city.trim()) errs.push("Vul uw postcode en woonplaats in.");
-  if(flowMode==="measure"&&!(p.prefDate1||p.prefDate2||p.prefDate3)) errs.push("Vul minimaal één voorkeursdatum in.");
+  ["customerName","email","address","city","prefDate1"].forEach(id=>clearFieldError($("#"+id)));
+  const req=(id,msg)=>{if(!p[id]||!p[id].trim())errs.push([id,msg])};
+  req("customerName","Vul je naam of organisatienaam in.");
+  if(!p.email||!p.email.trim()) errs.push(["email","Vul je e-mailadres in."]);
+  else if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email.trim())) errs.push(["email","Vul een geldig e-mailadres in, bijv. naam@voorbeeld.nl."]);
+  req("address","Vul het adres van het project in.");
+  req("city","Vul de postcode en plaats in.");
+  if(flowMode==="measure"&&!(p.prefDate1||p.prefDate2||p.prefDate3)) errs.push(["prefDate1","Kies minimaal één voorkeursdatum voor het inmeten."]);
   const box=$("#projectErrors");
   if(errs.length){
-    if(box){box.innerHTML=errs.map(e=>`<p style="margin:0 0 4px 0">• ${esc(e)}</p>`).join("");box.style.display="block";}
-    const first=$("#customerName:invalid,#email:invalid,#address:invalid,#city:invalid");
-    if(first) first.focus();
+    errs.forEach(([id,msg])=>setFieldError($("#"+id),msg));
+    if(box){box.innerHTML=`<p style="margin:0 0 6px 0"><b>Nog niet alle verplichte velden zijn ingevuld:</b></p>`+errs.map(([,e])=>`<p style="margin:0 0 4px 0">• ${esc(e)}</p>`).join("");box.style.display="block";}
+    const first=$("#"+errs[0][0]);
+    // Zorg dat de projectpagina zichtbaar is voordat we naar het veld scrollen.
+    const switched=currentPage!=="project";
+    if(switched)activatePage("project");
+    setTimeout(()=>{scrollToEl(first);first?.focus({preventScroll:true})},switched?350:0);
     return false;
   }
   if(box){box.style.display="none";box.innerHTML="";}
@@ -935,21 +1028,27 @@ function renderExportSummary(){
 async function submitOffer(){
   console.log('[GN] submitOffer called, flowMode=', flowMode, 'lastPlan=', !!lastPlan);
   const cb=$("#offerConsent");
-  if(cb&&!cb.checked)return alert("U moet akkoord gaan met de voorwaarden voordat u een offerte kunt aanvragen.");
-  if(!validateProject()){ activatePage('project'); return; }
+  if(cb&&!cb.checked){
+    const st=$("#submitStatus"),lbl=$("#offerConsentLabel");
+    if(st){st.innerHTML='<span class="warn">Vink eerst aan dat je akkoord gaat met de voorwaarden hierboven. Daarna kun je de offerte aanvragen.</span>';st.dataset.consentMsg="1"}
+    if(lbl){lbl.classList.remove("consent-missing");void lbl.offsetWidth;lbl.classList.add("consent-missing");scrollToEl(lbl)}
+    cb.focus({preventScroll:true});
+    return;
+  }
+  if(!validateProject())return;
   const p=projectData();
   if(flowMode!=="measure"&&!lastPlan){
     console.log('[GN] No lastPlan, generating...');
     const rollW=num($("#rollW").value),rollL=num($("#rollL").value),kerf=Math.max(0,num($("#kerf").value)||0);
-    if(!(rollW>0&&rollL>0))return alert("Voer geldige rolmaten in.");
+    if(!(rollW>0&&rollL>0))return alert("De rolmaten zijn niet ingesteld. Neem contact met ons op.");
     const {items,errors,splitNotices}=readItems(rollW);
     console.log('[GN] rollW=', rollW, 'rollL=', rollL, 'items=', items.length, 'errors=', errors);
-    if(errors.length)return alert(errors.join("\n"));
-    const btn0=$("#submitOffer");if(btn0){btn0.disabled=true;btn0.textContent="Berekenen…";}
+    if(errors.length){activatePage('planner');setTimeout(()=>showPlannerErrors(errors),350);return}
+    const btn0=offerSubmitBtn;if(btn0){btn0.disabled=true;btn0.textContent="Berekenen…";}
     try{
       const res=await optimize(items,rollW,kerf,parseInt($("#quality").value,10));
       console.log('[GN] optimize result=', !!res);
-      if(!res){if(btn0){btn0.disabled=false;btn0.textContent="Offerte aanvragen";}return alert("Geen geldige indeling gevonden.");}
+      if(!res){if(btn0){btn0.disabled=false;btn0.textContent="Offerte aanvragen";}return alert("Er kon geen geldige indeling worden gevonden. Controleer de ingevoerde maten.");}
       renderPlan(res,rollW,rollL,kerf,splitNotices);
       console.log('[GN] renderPlan done, lastPlan=', !!lastPlan);
     }finally{
@@ -957,8 +1056,8 @@ async function submitOffer(){
     }
   }
   console.log('[GN] Proceeding with submit, lastPlan=', !!lastPlan);
-  const btn=$("#submitOffer");btn.disabled=true;const orig=btn.textContent;btn.textContent="Verzenden…";
-  $("#submitStatus").innerHTML='<span class="note">Uw aanvraag wordt verzonden…</span>';
+  const btn=offerSubmitBtn;btn.disabled=true;const orig=btn.textContent;btn.textContent="Verzenden…";
+  $("#submitStatus").innerHTML='<span class="note">Je aanvraag wordt verzonden, een moment geduld…</span>';
   const data=collectProject();
   const formData=new FormData();
   formData.append("action","gn_submit_offer");
@@ -1002,8 +1101,8 @@ async function submitOffer(){
         const thankYouUrl=resp.data.thankYouUrl||"";
         $("#offerNumber").value=offerNumber;
         if(flowMode!=="measure")renderOffer();
-        $("#submitStatus").innerHTML=`<span class="ok">${esc(resp.data.message)} Uw referentienummer is: <b>${esc(offerNumber)}</b></span>`;
-        if(thankYouUrl){setTimeout(()=>{window.location.href=thankYouUrl},2000)}
+        $("#submitStatus").innerHTML=`<span class="ok">${esc(resp.data.message)} Je referentienummer is: <b>${esc(offerNumber)}</b></span>`;
+        if(thankYouUrl){setTimeout(()=>{window.location.href=thankYouUrl},800)}
       }else{
         $("#submitStatus").innerHTML=`<span class="warn">${esc(resp.data?.message||"Er is een fout opgetreden.")}</span>`;
       }
@@ -1032,18 +1131,16 @@ if(plannerNextBtn)plannerNextBtn.addEventListener('click',async e=>{
 const projectSubmitBtn=$('#projectSubmit');
 if(projectSubmitBtn)projectSubmitBtn.addEventListener('click',e=>{
   if(flowMode==='measure'){e.preventDefault();e.stopPropagation();
-    const measureBtn=$('#submitMeasure')||$('#projectSubmit');
+    const measureBtn=projectSubmitBtn;
     if(measureBtn){
-      measureBtn.id='submitOffer';
+      if(measureBtn.disabled) return;
       if(!validateProject()) return;
       const p=projectData();
       const btn=measureBtn;btn.disabled=true;const orig=btn.textContent;btn.textContent="Verzenden…";
-      const statusDiv=document.createElement('div');statusDiv.className='status';statusDiv.id='submitStatus';statusDiv.style.marginTop='12px';
-      const cardBody=btn.closest('.page-nav')?.previousElementSibling?.querySelector('.card-body')||btn.closest('.page');
-      const existing=$('#submitStatus');
-      if(!existing){btn.closest('.page-nav').parentNode.insertBefore(statusDiv,btn.closest('.page-nav'));}
-      const sd=$('#submitStatus')||statusDiv;
-      sd.innerHTML='<span class="note">Uw aanvraag wordt verzonden…</span>';
+      // Eigen statusregel op de projectpagina (de #submitStatus op de offertepagina is in deze flow niet zichtbaar).
+      let sd=$('#measureSubmitStatus');
+      if(!sd){sd=document.createElement('div');sd.className='status';sd.id='measureSubmitStatus';sd.style.marginTop='12px';btn.closest('.page-nav').parentNode.insertBefore(sd,btn.closest('.page-nav'));}
+      sd.innerHTML='<span class="note">Je aanvraag wordt verzonden, een moment geduld…</span>';
       const formData=new FormData();
       formData.append("action","gn_submit_offer");
       formData.append("nonce",gnNonce);
@@ -1073,8 +1170,8 @@ if(projectSubmitBtn)projectSubmitBtn.addEventListener('click',e=>{
           if(resp.success){
             const offerNumber=resp.data.offerNumber||"";
             const thankYouUrl=resp.data.thankYouUrl||"";
-            sd.innerHTML=`<span class="ok">${esc(resp.data.message)} Uw referentienummer is: <b>${esc(offerNumber)}</b></span>`;
-            if(thankYouUrl){setTimeout(()=>{window.location.href=thankYouUrl},2000)}
+            sd.innerHTML=`<span class="ok">${esc(resp.data.message)} Je referentienummer is: <b>${esc(offerNumber)}</b></span>`;
+            if(thankYouUrl){setTimeout(()=>{window.location.href=thankYouUrl},800)}
           }else{
             sd.innerHTML=`<span class="warn">${esc(resp.data?.message||"Er is een fout opgetreden.")}</span>`;
           }

@@ -184,6 +184,17 @@ class GN_Submissions {
             update_post_meta($post_id, '_gn_photo_attachment_ids', $photo_attachment_ids);
         }
 
+        $thankyou_url = get_option('gn_thankyou_url', '');
+        $response_data = [
+            'offerNumber'  => $offer_number,
+            'message'      => 'Je offerte-aanvraag is ontvangen. We nemen zo snel mogelijk contact met je op.',
+            'thankYouUrl'  => $thankyou_url,
+        ];
+
+        // De aanvraag is opgeslagen: stuur de bezoeker direct een antwoord en handel
+        // e-mail, webhook en Odoo-sync daarna af, zodat de klant daar niet op hoeft te wachten.
+        $responded_early = $this->respond_early($response_data);
+
         GN_Email::send_customer_confirmation($email, $offer_number, $customer_name);
         GN_Email::send_admin_notification($post_id, $offer_number, $customer_name, $email);
 
@@ -209,13 +220,40 @@ class GN_Submissions {
         update_post_meta($post_id, '_gn_odoo_order_id', $odoo_result['order_id'] ?? '');
         update_post_meta($post_id, '_gn_odoo_error', $odoo_result['error'] ?? '');
 
-        $thankyou_url = get_option('gn_thankyou_url', '');
+        if ($responded_early) {
+            exit;
+        }
+        wp_send_json_success($response_data);
+    }
 
-        wp_send_json_success([
-            'offerNumber'  => $offer_number,
-            'message'      => 'Uw offerte aanvraag is ontvangen. Wij nemen spoedig contact met u op.',
-            'thankYouUrl'  => $thankyou_url,
-        ]);
+    /**
+     * Stuurt het JSON-succesantwoord naar de browser en sluit de verbinding,
+     * zodat het script daarna op de achtergrond kan doorwerken.
+     * Alleen mogelijk onder PHP-FPM of LiteSpeed; anders false (dan synchroon zoals voorheen).
+     */
+    private function respond_early(array $data) {
+        if (!function_exists('fastcgi_finish_request') && !function_exists('litespeed_finish_request')) {
+            return false;
+        }
+        ignore_user_abort(true);
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(120);
+        }
+        if (!headers_sent()) {
+            status_header(200);
+            header('Content-Type: application/json; charset=' . get_option('blog_charset'));
+        }
+        echo wp_json_encode(['success' => true, 'data' => $data]);
+        while (ob_get_level() > 0) {
+            ob_end_flush();
+        }
+        flush();
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+        } else {
+            litespeed_finish_request();
+        }
+        return true;
     }
 
     public function dispatch_makecom_webhook($decoded, $offer_number, $customer_name, $contact_name, $email, $phone, $address, $city) {

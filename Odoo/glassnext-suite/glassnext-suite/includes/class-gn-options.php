@@ -131,6 +131,10 @@ class GN_Options {
         $options = [];
         foreach ($instance->defaults as $key => $default) {
             $val = get_option($key, $default);
+            // Lege tooltipteksten (bijv. opgeslagen via een leeg formulierveld) vallen terug op de standaardtekst.
+            if ($val === '' && preg_match('/^gn_tooltip_[a-z]+_text$/', $key)) {
+                $val = $default;
+            }
             $options[$key] = $val;
         }
         return $options;
@@ -338,7 +342,7 @@ class GN_Options {
 
                 <div class="gn-tab-panel" data-tab="tooltips">
                 <h2 class="title">Snijplanner tooltips</h2>
-                <p class="description" style="margin-bottom:15px">Deze teksten en afbeeldingen verschijnen als tooltip (ⓘ) bij de kolomkoppen in de snijplanner tabel. Laat een tekst leeg om de tooltip voor die kolol uit te schakelen.</p>
+                <p class="description" style="margin-bottom:15px">Deze teksten en afbeeldingen verschijnen als tooltip (ⓘ) bij de kolomkoppen in de snijplanner tabel. Laat een tekst leeg om de standaardtekst te gebruiken.</p>
                 <table class="form-table">
                     <?php
                     $tooltip_cols = [
@@ -351,6 +355,7 @@ class GN_Options {
                     ];
                     foreach ($tooltip_cols as $col => $label) :
                         $text_val = get_option("gn_tooltip_{$col}_text", '');
+                        if ($text_val === '') $text_val = $this->defaults["gn_tooltip_{$col}_text"] ?? '';
                         $img_id   = get_option("gn_tooltip_{$col}_image", '');
                         $img_url  = $img_id ? wp_get_attachment_url($img_id) : '';
                     ?>

@@ -89,7 +89,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
       </div>
       <div style="margin-top:12px"><label>Projectomschrijving / situatie</label><textarea id="projectDescription" placeholder="Bijvoorbeeld: bestaande beglazing voorzien van Nano-EcoLine Climate GlassShield."></textarea></div>
       <div style="margin-top:12px"><label>Bijzonderheden</label><textarea id="projectNotes" placeholder="Bereikbaarheid, planning, glasconditie, werktijden, aandachtspunten..."></textarea></div>
-      <div id="projectErrors" class="status warn" style="display:none;margin-top:14px"></div>
+      <div id="projectErrors" class="status warn error-box" style="display:none;margin-top:14px" role="alert"></div>
       <div style="margin-top:16px">
         <label>Foto's van de ruiten (optioneel, maximaal 3)</label>
         <div id="photoUploadArea" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
@@ -181,6 +181,7 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
       <div class="pane-add-row no-print">
         <button class="btn" id="addPane">+ Ruitmaat toevoegen</button>
       </div>
+      <div id="plannerErrors" class="status warn error-box" style="display:none;margin-top:14px" role="alert"></div>
     </div>
   </article>
 
@@ -350,17 +351,17 @@ if (!defined('GN_PLUGIN_URL')) define('GN_PLUGIN_URL', '');
   <article class="card span-12">
     <div class="card-head"><h2>Offerte aanvragen</h2></div>
     <div class="card-body">
-      <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;cursor:pointer;font-size:13px;line-height:1.5">
+      <label id="offerConsentLabel" class="consent-label" style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;cursor:pointer;font-size:13px;line-height:1.5">
         <input type="checkbox" id="offerConsent" style="width:auto;margin-top:3px">
         <span>Ik begrijp dat deze offerte een scenarioanalyse is, exclusief de montagekosten, en afhankelijk is van de werkelijke glasopbouw, gebouwcondities, installaties, energieprijzen en het gebruik. Aan de uitkomst kunnen geen gegarandeerde besparingen worden ontleend. Deze offerte is gebaseerd op de ingevoerde ruitmaten en het berekende snijplan. Definitieve maatvoering en geschiktheid van de beglazing worden vóór uitvoering gecontroleerd.</span>
       </label>
-      <div id="submitStatus" class="status" style="margin-top:12px"></div>
+      <div id="submitStatus" class="status" style="margin-top:12px" role="status" aria-live="polite"></div>
     </div>
   </article>
 </div>
 <div class="page-nav no-print">
   <button class="btn secondary nav-prev" type="button" data-target="project">Vorige</button>
-  <button class="btn nav-next" id="submitOffer" type="button" data-target="workorder" disabled>Offerte aanvragen</button>
+  <button class="btn nav-next is-disabled" id="submitOffer" type="button" data-target="workorder" aria-disabled="true">Offerte aanvragen</button>
 </div>
 </section>
 
