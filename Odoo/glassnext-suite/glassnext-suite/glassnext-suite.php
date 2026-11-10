@@ -2,14 +2,14 @@
 /**
  * Plugin Name: GlassNext Suite
  * Description: Klant-facing tool voor snijplanner, calculatie, ROI en offerte aanvraag.
- * Version: 1.9.1
+ * Version: 1.9.2
  * Author: GlassNext
  * Text Domain: glassnext-suite
  */
 
 if (!defined('ABSPATH')) exit;
 
-define('GN_VERSION', '1.9.1');
+define('GN_VERSION', '1.9.2');
 define('GN_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('GN_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('GN_PLUGIN_BASENAME', plugin_basename(__FILE__));
@@ -53,6 +53,14 @@ class GlassNext_Suite {
         wp_register_script('glassnext-tool', GN_PLUGIN_URL . 'assets/glassnext-tool.js', ['jspdf'], GN_VERSION, true);
 
         $options = GN_Options::get_all_options();
+
+        // Nooit geheimen of integratie-instellingen naar de (publieke) frontend sturen.
+        foreach (array_keys($options) as $key) {
+            if (strpos($key, 'gn_odoo_') === 0 || strpos($key, 'gn_recaptcha_') === 0 || strpos($key, 'gn_newsletter_list') === 0
+                || in_array($key, ['gn_makecom_webhook_url', 'gn_admin_email', 'gn_from_email', 'gn_offer_counter', 'gn_offer_counter_year'], true)) {
+                unset($options[$key]);
+            }
+        }
 
         // Convert tooltip image attachment IDs to URLs for frontend use
         $tooltip_cols = ['kenmerk', 'breedte', 'hoogte', 'aantal', 'rotatie', 'ruimte'];

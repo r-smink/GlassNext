@@ -913,6 +913,18 @@ class GN_Odoo {
         throw new Exception('Authenticatie bij Odoo mislukt. /jsonrpc result: ' . $result['raw'] . ' | /web/session result: ' . $result2['raw'] . ' | Tip: als de test met hardcoded UID wel werkte, zorg dat de instellingen zijn opgeslagen (opgeslagen gn_odoo_uid=' . $uid . ').');
     }
 
+    /**
+     * Publieke execute_kw-wrapper voor uitbreidingen (bijv. de GlassNext Dealer Suite),
+     * zodat die dezelfde Odoo-instellingen en verbindingslogica hergebruiken.
+     * Gooit een Exception bij fouten.
+     */
+    public function rpc($model, $method, $args, $kwargs = null) {
+        if (!$this->is_configured()) {
+            throw new Exception('Odoo-koppeling is niet geconfigureerd (GlassNext Suite > Instellingen > Odoo).');
+        }
+        return $this->call($model, $method, $args, $kwargs);
+    }
+
     private function call($model, $method, $args, $kwargs = null) {
         $url = trailingslashit(get_option('gn_odoo_url', '')) . 'jsonrpc';
 

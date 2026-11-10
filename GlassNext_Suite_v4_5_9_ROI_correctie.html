@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GlassNext Suite v4.4 – ROI TDS</title>
+<title>GlassNext Suite v4.5.9 – ROI TDS</title>
 <style>
 :root{
   --navy:#0b1e2d;--navy2:#14334d;--blue:#1786d8;--blue2:#4db6e8;
@@ -57,6 +57,7 @@ canvas{display:block;background:#fff}.legend{display:flex;gap:10px;flex-wrap:wra
 .doc-head{display:flex;justify-content:space-between;gap:20px;border-bottom:3px solid var(--navy);padding-bottom:14px;margin-bottom:22px}.doc-brand{font-size:24px;font-weight:850;color:var(--navy)}.doc h1{font-size:22px;margin:0 0 16px}.doc h3{margin:20px 0 7px;color:var(--navy)}.doc table th{position:static}
 .signature-grid{display:grid;grid-template-columns:1fr 1fr;gap:35px;margin-top:40px}.signature{border-top:1px solid #8da0ad;padding-top:7px;min-height:70px}
 .pill{display:inline-block;padding:4px 9px;border-radius:999px;background:#e8f4fc;color:#176999;font-size:12px;font-weight:750}
+.import-drop{border:2px dashed #b9cddd;border-radius:9px;padding:13px;margin-bottom:12px;text-align:center;background:#f7fafc;color:#40586a;cursor:pointer}.import-drop.drag-over{border-color:var(--blue);background:#e8f4fc}.import-drop:focus{outline:2px solid var(--blue)}
 .hidden{display:none!important}
 @media(max-width:950px){.span-8,.span-7,.span-6,.span-5,.span-4{grid-column:span 12}.fields.three{grid-template-columns:1fr 1fr}}
 @media(max-width:650px){.shell{padding:10px}.fields,.fields.three{grid-template-columns:1fr}.topbar{position:static}.doc{padding:15px}.signature-grid{grid-template-columns:1fr}.top-logo{height:44px;max-width:92px}.other-cost-row,.mount-rate-line{grid-template-columns:1fr}}
@@ -114,8 +115,8 @@ canvas{display:block;background:#fff}.legend{display:flex;gap:10px;flex-wrap:wra
       <div class="fields">
         <div><label>Rolbreedte (mm)</label><input id="rollW" type="number" value="1520" min="1"></div>
         <div><label>Rollengte (mm)</label><input id="rollL" type="number" value="60000" min="1"></div>
-        <div><label>Snijrand per zijde (mm)</label><input id="marginSide" type="number" value="40" min="0"></div>
-        <div><label>Tussenruimte (mm)</label><input id="kerf" type="number" value="5" min="0"></div>
+        <div><label>Snijrand per zijde (mm)</label><input id="marginSide" type="number" value="30" min="0"></div>
+        <div><label>Tussenruimte (mm)</label><input id="kerf" type="number" value="10" min="0"></div>
         <div><label>Optimalisatie</label><select id="quality"><option value="50">Snel</option><option value="140" selected>Normaal</option><option value="350">Grondig</option></select></div>
         <div><label>Rotatie standaard</label><select id="rotateDefault"><option value="1" selected>Ja</option><option value="0">Nee</option></select></div>
       </div>
@@ -132,10 +133,13 @@ canvas{display:block;background:#fff}.legend{display:flex;gap:10px;flex-wrap:wra
   <article class="card span-12">
     <div class="card-head">
       <h2>Ramen invoeren</h2>
-      <div class="toolbar no-print"><button class="btn ghost" id="addPane">+ Ruitmaat</button><button class="btn secondary" id="demoPanes">Demo laden</button></div>
+      <div class="toolbar no-print"><button class="btn ghost" id="addPane">+ Ruitmaat</button><button class="btn secondary" id="importPanes">Maten importeren</button><button class="btn secondary" id="downloadPaneTemplate">CSV-sjabloon</button></div>
     </div>
-    <div class="card-body table-wrap">
-      <table id="paneTable"><thead><tr><th>Kenmerk</th><th>Breedte cm</th><th>Hoogte cm</th><th>Aantal</th><th>Rotatie</th><th>Ruimte / verdieping</th><th></th></tr></thead><tbody></tbody></table>
+    <div class="card-body">
+      <input type="file" id="paneImportFile" accept=".csv,.xlsx" class="hidden">
+      <div id="paneDrop" class="import-drop no-print" tabindex="0" role="button" aria-label="Sleep CSV- of Excel-bestand hierheen of klik om te kiezen">Sleep een CSV- of XLSX-bestand hierheen, of klik om een bestand te kiezen.<div class="note">Kolommen: Kenmerk, Breedte cm, Hoogte cm, Aantal, Rotatie, Ruimte / verdieping. Bestaande ruitmaten worden na bevestiging vervangen.</div></div>
+      <div id="paneImportStatus" class="status no-print" aria-live="polite"></div>
+      <div class="table-wrap"><table id="paneTable"><thead><tr><th>Kenmerk</th><th>Breedte cm</th><th>Hoogte cm</th><th>Aantal</th><th>Rotatie</th><th>Ruimte / verdieping</th><th></th></tr></thead><tbody></tbody></table></div>
     </div>
   </article>
 
@@ -166,8 +170,9 @@ canvas{display:block;background:#fff}.legend{display:flex;gap:10px;flex-wrap:wra
     <div class="card-head"><h2>Prijsinstellingen</h2></div>
     <div class="card-body">
       <div class="fields">
-        <div><label>Materiaalprijs per verbruikte m²</label><input id="materialPrice" type="number" step="0.01" value="130"></div>
-        <div><label>Voorsnijprijs per stuk</label><input id="cutPrice" type="number" step="0.01" value="1.50"></div>
+        <div><label>Materiaalprijs per verbruikte m²</label><input id="materialPrice" type="number" step="0.01" value="129"></div>
+        <div><label>Startkosten voorsnijden</label><input id="cutStart" type="number" step="0.01" value="25.00"></div>
+        <div><label>Voorsnijprijs per stuk</label><input id="cutPrice" type="number" step="0.01" value="3.50"></div>
         <div><label>Materiaalkorting (%)</label><input id="materialDiscount" type="number" step="0.1" value="0"></div>
         <div><label>Montagekorting (%)</label><input id="mountDiscount" type="number" step="0.1" value="0"></div>
         <div><label>BTW (%)</label><input id="vatRate" type="number" step="0.1" value="21"></div>
@@ -239,11 +244,11 @@ canvas{display:block;background:#fff}.legend{display:flex;gap:10px;flex-wrap:wra
       </div>
       <h3>Gebouw- en installatieparameters</h3>
       <div class="fields">
-        <div><label>Heating Degree Days per jaar</label><input id="roiHDD" type="number" min="0" step="1" value="4676"></div>
-        <div><label>Ketelrendement (%)</label><input id="roiBoilerEff" type="number" min="1" max="100" step="0.1" value="90"></div>
+        <div><label>Verwarmingsgraaddagen (HDD) per jaar</label><input id="roiHDD" type="number" min="0" step="1" value="3200"></div>
+        <div><label>Ketelrendement (%)</label><input id="roiBoilerEff" type="number" min="1" max="100" step="0.1" value="85"></div>
         <div><label>Energie-inhoud gas (kWh/m³)</label><input id="roiGasKwh" type="number" min="0.1" step="0.01" value="9.77"></div>
         <div><label>Handmatige gasbesparing (m³/m²/jaar)</label><input id="roiGasSaveM2" type="number" min="0" step="0.0001" value="16.2089"></div>
-        <div><label>Elektrabesparing koeling (kWh/m²/jaar)</label><input id="roiCoolSaveM2" type="number" min="0" step="0.01" value="15"></div>
+        <div><label>Elektrabesparing koeling (kWh/m²/jaar)</label><input id="roiCoolSaveM2" type="number" min="0" step="0.01" value="25"></div>
         <div><label>Correctiefactor gebouw (%)</label><input id="roiBuildingFactor" type="number" min="0" step="1" value="100"></div>
       </div>
       <p class="note">De Ug-waarden en verbeteringspercentages in het keuzemenu zijn rechtstreeks overgenomen uit de Nano-EcoLine GlassShield TDS. De BTU-waarden worden omgerekend met 1 W/m²K = 0,1761101838 BTU/(h·ft²·°F).</p>
@@ -258,7 +263,7 @@ canvas{display:block;background:#fff}.legend{display:flex;gap:10px;flex-wrap:wra
         <div><label>Investeringsbron</label><select id="roiInvestmentSource"><option value="calculation" selected>Projectcalculatie excl. btw</option><option value="manual">Handmatig bedrag</option></select></div>
         <div><label>Bruto investering excl. btw</label><input id="roiInvestment" type="number" min="0" step="0.01" value="0"></div>
         <div><label>EIA / subsidie netto voordeel (%)</label><input id="roiEiaNet" type="number" min="0" step="0.1" value="0"></div>
-        <div><label>Gasprijs (€/m³)</label><input id="roiGasPrice" type="number" min="0" step="0.01" value="1.31"></div>
+        <div><label>Gasprijs (€/m³)</label><input id="roiGasPrice" type="number" min="0" step="0.01" value="1.76"></div>
         <div><label>Elektriciteitsprijs (€/kWh)</label><input id="roiElecPrice" type="number" min="0" step="0.01" value="0.27"></div>
         <div><label>CO₂-prijs (€/ton)</label><input id="roiCO2Price" type="number" min="0" step="1" value="70"></div>
         <div><label>CO₂-factor gas (kg/m³)</label><input id="roiCO2Gas" type="number" min="0" step="0.001" value="2.134"></div>
@@ -318,9 +323,11 @@ canvas{display:block;background:#fff}.legend{display:flex;gap:10px;flex-wrap:wra
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script>
 "use strict";
-// GlassNext Suite v4.4 – v4.3 onveranderd + aangepaste standaard montageprijzen
+// v4.5.5: performancefix — geen async/await meer per kandidaatpositie; alleen sporadisch browser-yield.
+// GlassNext Suite v4.5.1 – v4.5 onveranderd + gecorrigeerde schermweergave lange snijplannen
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const EPS=.0001;
 const fmtN=(n,d=2)=>new Intl.NumberFormat("nl-NL",{minimumFractionDigits:d,maximumFractionDigits:d}).format(Number(n)||0);
@@ -356,15 +363,83 @@ function addPaneRow(p={}){
   paneBody.appendChild(tr);
 }
 $("#addPane").onclick=()=>addPaneRow();
-$("#demoPanes").onclick=()=>{paneBody.innerHTML="";[
-  {id:"R1",w:140,h:200,n:2,room:"Woonkamer"},
-  {id:"R2",w:48,h:96,n:6,room:"Entree"},
-  {id:"R3",w:88,h:68,n:4,room:"Slaapkamer"}
-].forEach(addPaneRow)};
+// CSV werkt lokaal; XLSX wordt gelezen via de SheetJS-bibliotheek.
+const PANE_HEADERS=["Kenmerk","Breedte cm","Hoogte cm","Aantal","Rotatie","Ruimte / verdieping"];
+function parsePaneCSV(text){
+  text=String(text).replace(/^\uFEFF/,"");
+  const first=text.split(/\r?\n/).find(x=>x.trim())||"";
+  const delimiter=[";",",","\t"].sort((a,b)=>first.split(b).length-first.split(a).length)[0];
+  const rows=[],row=[];let field="",quoted=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(c==='"') {if(quoted&&text[i+1]==='"'){field+='"';i++;}else quoted=!quoted;}
+    else if(c===delimiter&&!quoted){row.push(field);field="";}
+    else if((c==='\n'||c==='\r')&&!quoted){if(c==='\r'&&text[i+1]==='\n')i++;row.push(field);if(row.some(x=>String(x).trim()))rows.push(row.slice());row.length=0;field="";}
+    else field+=c;
+  }
+  if(quoted)throw Error("Niet-afgesloten aanhalingsteken in CSV.");
+  row.push(field);if(row.some(x=>String(x).trim()))rows.push(row);
+  return rows;
+}
+function normalizePaneHeader(v){return String(v??"").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");}
+function parsePaneRows(rows){
+  const header=rows[0]||[],normalized=header.map(normalizePaneHeader);
+  const aliases=[["kenmerk","ruit","ruitnummer","id"],["breedtecm","breedte"],["hoogtecm","hoogte"],["aantal","stuks"],["rotatie","draaien"],["ruimteverdieping","ruimte","verdieping","omschrijving"]];
+  const indexes=aliases.map(group=>normalized.findIndex(h=>group.includes(h)));
+  if(indexes.slice(0,4).some(i=>i<0))throw Error("Verplichte kolommen ontbreken. Gebruik het CSV-sjabloon (Kenmerk, Breedte cm, Hoogte cm, Aantal).");
+  const parsed=[],errors=[];
+  rows.slice(1).forEach((cells,i)=>{
+    if(!cells.some(v=>String(v??"").trim()))return;
+    const get=j=>indexes[j]<0?"":String(cells[indexes[j]]??"").trim();
+    const id=get(0)||`R${i+1}`,w=num(get(1)),h=num(get(2)),n=Number(get(3));
+    const rawRot=normalizePaneHeader(get(4));
+    const rot=rawRot===""?$("#rotateDefault").value:(["ja","j","yes","true","1"].includes(rawRot)?"1":(["nee","n","no","false","0"].includes(rawRot)?"0":null));
+    if(!Number.isFinite(w)||w<=0||!Number.isFinite(h)||h<=0||!Number.isInteger(n)||n<1||rot===null){errors.push(`Regel ${i+2}: controleer breedte, hoogte, aantal en rotatie.`);return;}
+    parsed.push({id,w,h,n,rot,room:get(5)});
+  });
+  if(errors.length)throw Error(errors.slice(0,8).join("\n")+(errors.length>8?`\n... en ${errors.length-8} andere fouten.`:""));
+  if(!parsed.length)throw Error("Geen geldige ruitmaten gevonden.");
+  return parsed;
+}
+async function importPaneFile(file){
+  if(!file)return;
+  const status=$("#paneImportStatus");status.className="status";status.textContent=`Bestand controleren: ${file.name}`;
+  try{
+    const ext=file.name.split(".").pop().toLowerCase();let rows;
+    if(ext==="csv")rows=parsePaneCSV(await file.text());
+    else if(ext==="xlsx"){
+      if(!window.XLSX)throw Error("Excel-import is niet beschikbaar omdat de Excel-bibliotheek niet is geladen. Controleer de internetverbinding of gebruik CSV.");
+      const workbook=XLSX.read(await file.arrayBuffer(),{type:"array"});
+      rows=XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]],{header:1,defval:"",raw:false});
+    }else throw Error("Kies een CSV- of XLSX-bestand.");
+    const panes=parsePaneRows(rows);
+    if(!confirm(`${panes.length} ruitmaatregels gevonden in ${file.name}.\n\nDe huidige ruitmaten vervangen door deze import?`)){
+      status.textContent="Import geannuleerd. Bestaande ruitmaten zijn behouden.";return;
+    }
+    paneBody.innerHTML="";panes.forEach(addPaneRow);
+    lastPlan=null;lastCalc=null;lastROI=null;
+    $("#planMetrics").innerHTML="";$("#pieceReport").textContent="Ruitmaten geïmporteerd. Bereken het snijplan opnieuw.";
+    status.className="status ok";status.textContent=`${panes.length} ruitmaatregels succesvol geïmporteerd uit ${file.name}.`;
+  }catch(err){status.className="status danger-text";status.textContent=`Import niet uitgevoerd: ${err.message}`;}
+}
+$("#importPanes").onclick=()=>$("#paneImportFile").click();
+$("#paneImportFile").onchange=e=>{const file=e.target.files[0];e.target.value="";importPaneFile(file);};
+$("#downloadPaneTemplate").onclick=()=>{
+  const csv="\uFEFF"+[PANE_HEADERS,["R1","88","68","4","Ja","Woonkamer"],["R2","140","200","2","Nee","Entree"]].map(row=>row.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(";")).join("\r\n");
+  downloadBlob(new Blob([csv],{type:"text/csv;charset=utf-8"}),"GlassNext_ruitmaten_sjabloon.csv");
+};
+const paneDrop=$("#paneDrop");
+paneDrop.onclick=()=>$("#paneImportFile").click();
+paneDrop.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();$("#paneImportFile").click();}};
+["dragenter","dragover"].forEach(type=>paneDrop.addEventListener(type,e=>{e.preventDefault();paneDrop.classList.add("drag-over");}));
+["dragleave","drop"].forEach(type=>paneDrop.addEventListener(type,e=>{e.preventDefault();paneDrop.classList.remove("drag-over");}));
+paneDrop.addEventListener("drop",e=>importPaneFile(e.dataTransfer.files[0]));
 addPaneRow({id:"R1",w:88,h:68,n:4});
 
-function readItems(){
-  const margin=Math.max(0,num($("#marginSide").value)||0),items=[],errors=[];
+function readItems(rollW=null){
+  const margin=Math.max(0,num($("#marginSide").value)||0),items=[],errors=[],splitNotices=[];
+  const fitsRoll=(w,h,canRotate)=>rollW==null||w<=rollW+EPS||(canRotate&&h<=rollW+EPS);
+
   $$("#paneTable tbody tr").forEach((tr,row)=>{
     const id=tr.querySelector(".pid").value.trim()||`R${row+1}`;
     const netW=(num(tr.querySelector(".pw").value)||0)*10;
@@ -373,10 +448,69 @@ function readItems(){
     const canRotate=tr.querySelector(".prot").value==="1";
     const room=tr.querySelector(".proom").value.trim();
     if(netW<=0||netH<=0){errors.push(`${id}: voer geldige breedte en hoogte in.`);return}
-    for(let i=1;i<=count;i++)items.push({baseId:id,copy:i,label:count>1?`${id}-${i}`:id,room,netW,netH,w:netW+2*margin,h:netH+2*margin,canRotate,margin});
+
+    const fullW=netW+2*margin,fullH=netH+2*margin;
+
+    if(fitsRoll(fullW,fullH,canRotate)){
+      for(let i=1;i<=count;i++){
+        items.push({baseId:id,copy:i,label:count>1?`${id}-${i}`:id,room,netW,netH,w:fullW,h:fullH,canRotate,margin,split:false});
+      }
+      return;
+    }
+
+    // De volledige ruit past niet op de rol. Probeer twee gelijke delen.
+    // Elk deel krijgt op de drie buitenzijden de normale snijrand.
+    // Op de naadzijde wordt géén extra snijrand toegevoegd.
+    const alternatives=[
+      {
+        axis:"width",
+        partNetW:netW/2, partNetH:netH,
+        grossW:netW/2+margin, grossH:netH+2*margin,
+        seamA:"rechts", seamB:"links"
+      },
+      {
+        axis:"height",
+        partNetW:netW, partNetH:netH/2,
+        grossW:netW+2*margin, grossH:netH/2+margin,
+        seamA:"onder", seamB:"boven"
+      }
+    ].filter(a=>fitsRoll(a.grossW,a.grossH,canRotate));
+
+    if(!alternatives.length){
+      errors.push(`${id}: past niet uit één stuk en ook niet als twee gelijke delen op de rol.`);
+      return;
+    }
+
+    // Kies, indien beide varianten passen, de variant met de kortste benodigde
+    // lengterichting. Dit geeft in de praktijk de meest logische tweedeling.
+    alternatives.sort((a,b)=>{
+      const lenA=canRotate?Math.max(a.grossW,a.grossH):a.grossH;
+      const lenB=canRotate?Math.max(b.grossW,b.grossH):b.grossH;
+      return lenA-lenB;
+    });
+    const split=alternatives[0];
+
+    splitNotices.push(`${id}: ${count} ${count===1?"raam":"ramen"} automatisch verdeeld in Deel A en Deel B; de naadzijde heeft geen extra snijrand.`);
+
+    for(let i=1;i<=count;i++){
+      const paneLabel=count>1?`${id}-${i}`:id;
+      items.push({
+        baseId:id,copy:i,label:`${paneLabel} - Deel A`,room,
+        netW:split.partNetW,netH:split.partNetH,w:split.grossW,h:split.grossH,
+        canRotate,margin,split:true,splitPart:"A",splitAxis:split.axis,seamSide:split.seamA,
+        originalNetW:netW,originalNetH:netH
+      });
+      items.push({
+        baseId:id,copy:i,label:`${paneLabel} - Deel B`,room,
+        netW:split.partNetW,netH:split.partNetH,w:split.grossW,h:split.grossH,
+        canRotate,margin,split:true,splitPart:"B",splitAxis:split.axis,seamSide:split.seamB,
+        originalNetW:netW,originalNetH:netH
+      });
+    }
   });
-  if(!items.length)errors.push("Voer minimaal één geldige ruit in.");
-  return{items,errors};
+
+  if(!items.length&&!errors.length)errors.push("Voer minimaal één geldige ruit in.");
+  return{items,errors,splitNotices};
 }
 function intersects(a,b,g){return !(a.x+a.w+g<=b.x+EPS||b.x+b.w+g<=a.x+EPS||a.y+a.h+g<=b.y+EPS||b.y+b.h+g<=a.y+EPS)}
 function candidates(placed,rollW,g){
@@ -385,26 +519,50 @@ function candidates(placed,rollW,g){
   return arr.sort((a,b)=>a.y-b.y||a.x-b.x);
 }
 function lexLess(a,b){for(let i=0;i<a.length;i++){if(a[i]<b[i])return true;if(a[i]>b[i])return false}return false}
-function placeSequence(seq,rollW,kerf){
+async function placeSequence(seq,rollW,kerf,onWork){
   const placed=[];
+  let currentMaxY=0, workCounter=0, lastYield=performance.now();
+
   for(const item of seq){
-    let best=null;const oris=[{w:item.w,h:item.h,rotated:false}];
+    let best=null;
+    const oris=[{w:item.w,h:item.h,rotated:false}];
     if(item.canRotate&&Math.abs(item.w-item.h)>EPS)oris.push({w:item.h,h:item.w,rotated:true});
     const pts=candidates(placed,rollW,kerf);
+
     for(const o of oris){
       if(o.w>rollW+EPS)continue;
       for(const pt of pts){
         if(pt.x+o.w>rollW+EPS)continue;
         const t={x:pt.x,y:pt.y,w:o.w,h:o.h};
         if(placed.some(p=>intersects(t,p,kerf)))continue;
-        const newLen=Math.max(t.y+t.h,...placed.map(p=>p.y+p.h),0);
+        const newLen=Math.max(currentMaxY,t.y+t.h);
         const score=[newLen,t.y,t.x,o.rotated?1:0];
         if(!best||lexLess(score,best.score))best={...t,rotated:o.rotated,item,score};
+
+        // BELANGRIJK: géén await/Promise meer bij ieder kandidaatpunt.
+        // Alleen zeer sporadisch controleren of de browser even lucht nodig heeft.
+        // Zo blijft de rekensnelheid vrijwel gelijk aan de oorspronkelijke Suite.
+        workCounter++;
+        if((workCounter & 8191)===0 && performance.now()-lastYield>120){
+          if(onWork)onWork();
+          await new Promise(requestAnimationFrame);
+          lastYield=performance.now();
+        }
       }
     }
-    if(!best)return null;placed.push(best);
+
+    if(!best)return null;
+    placed.push(best);
+    currentMaxY=Math.max(currentMaxY,best.y+best.h);
+
+    // Alleen tussen complete stukken eventueel kort teruggeven aan de browser.
+    if(performance.now()-lastYield>120){
+      if(onWork)onWork();
+      await new Promise(requestAnimationFrame);
+      lastYield=performance.now();
+    }
   }
-  return{placed,totalLen:Math.max(0,...placed.map(p=>p.y+p.h))};
+  return{placed,totalLen:currentMaxY};
 }
 function rng(seed){return function(){let t=seed+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
 function shuffle(a,r){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b}
@@ -423,31 +581,60 @@ function orders(items,n){
 }
 async function optimize(items,rollW,kerf,attempts){
   let best=null,all=orders(items,attempts);
+  const updateProgress=(i)=>{
+    $("#progressBar").style.width=`${Math.round((i+1)/all.length*100)}%`;
+    $("#planStatus").textContent=`Optimaliseren… proef ${i+1} van ${all.length}`;
+  };
   for(let i=0;i<all.length;i++){
-    const res=placeSequence(all[i],rollW,kerf);
+    updateProgress(i);
+    const res=await placeSequence(all[i],rollW,kerf,()=>updateProgress(i));
     if(res&&(!best||res.totalLen<best.totalLen-EPS))best=res;
-    if(i%10===0){$("#progressBar").style.width=`${Math.round((i+1)/all.length*100)}%`;$("#planStatus").textContent=`Optimaliseren… proef ${i+1} van ${all.length}`;await new Promise(r=>setTimeout(r,0))}
+    // Eén browsermoment per volledige proef is voldoende.
+    if((i & 7)===7) await new Promise(requestAnimationFrame);
   }
-  $("#progressBar").style.width="100%";return best;
+  $("#progressBar").style.width="100%";
+  return best;
 }
 function planStats(res,rollW,rollL){
   const net=res.placed.reduce((s,p)=>s+p.item.netW*p.item.netH,0),gross=res.placed.reduce((s,p)=>s+p.w*p.h,0),roll=rollW*res.totalLen,waste=Math.max(0,roll-gross);
   return{netArea:net/1e6,grossArea:gross/1e6,rollArea:roll/1e6,wasteArea:waste/1e6,eff:roll?gross/roll*100:0,loss:roll?waste/roll*100:0,remaining:(rollL-res.totalLen)/1000};
 }
 function drawPlan(res,rollW){
-  const c=$("#planCanvas"),ctx=c.getContext("2d"),pxW=1000,scale=pxW/rollW,h=Math.max(450,Math.ceil(res.totalLen*scale)+30);
-  c.width=pxW;c.height=h;ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);ctx.strokeStyle="#102535";ctx.lineWidth=2;ctx.strokeRect(1,1,rollW*scale-2,res.totalLen*scale-2);
+  const c=$("#planCanvas"),ctx=c.getContext("2d");
+  const preferredW=1000,maxCanvasH=28000;
+  // Bij lange snijplannen kon het canvas hoger worden dan de browser technisch
+  // kan weergeven. De PDF/CSV bleven dan wel werken, maar het scherm bleef leeg.
+  // Daarom schalen we uitsluitend de schermweergave zo nodig iets terug.
+  const scaleByWidth=preferredW/rollW;
+  const scaleByHeight=(maxCanvasH-30)/Math.max(res.totalLen,1);
+  const scale=Math.min(scaleByWidth,scaleByHeight);
+  const canvasW=Math.max(1,Math.ceil(rollW*scale));
+  const canvasH=Math.max(450,Math.ceil(res.totalLen*scale)+30);
+
+  c.width=canvasW;c.height=canvasH;
+  ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);
+  ctx.strokeStyle="#102535";ctx.lineWidth=2;
+  ctx.strokeRect(1,1,rollW*scale-2,res.totalLen*scale-2);
   ctx.font="12px Segoe UI";ctx.textBaseline="top";
-  res.placed.forEach(p=>{const x=p.x*scale,y=p.y*scale,w=p.w*scale,h=p.h*scale;ctx.fillStyle=colorFor(p.item.baseId);ctx.fillRect(x,y,w,h);ctx.strokeStyle="#344d60";ctx.lineWidth=1;ctx.strokeRect(x,y,w,h);ctx.fillStyle="#102535";if(w>42&&h>17)ctx.fillText(`${p.item.label}${p.rotated?" ↻":""}`,x+4,y+4);if(w>90&&h>35)ctx.fillText(`${Math.round(p.w)}×${Math.round(p.h)} mm`,x+4,y+20)});
+
+  res.placed.forEach(p=>{
+    const x=p.x*scale,y=p.y*scale,w=p.w*scale,h=p.h*scale;
+    ctx.fillStyle=colorFor(p.item.baseId);ctx.fillRect(x,y,w,h);
+    ctx.strokeStyle="#344d60";ctx.lineWidth=1;ctx.strokeRect(x,y,w,h);
+    ctx.fillStyle="#102535";
+    if(w>42&&h>17)ctx.fillText(`${p.item.label}${p.rotated?" ↻":""}`,x+4,y+4);
+    if(w>90&&h>35)ctx.fillText(`${Math.round(p.w)}×${Math.round(p.h)} mm`,x+4,y+20);
+  });
 }
-function renderPlan(res,rollW,rollL,kerf){
+function renderPlan(res,rollW,rollL,kerf,splitNotices=[]){
   const stats=planStats(res,rollW,rollL),errors=[];
   res.placed.forEach(p=>{if(p.x<0||p.y<0||p.x+p.w>rollW+EPS)errors.push(`${p.item.label} buiten rolbreedte`)});
   for(let i=0;i<res.placed.length;i++)for(let j=i+1;j<res.placed.length;j++)if(intersects(res.placed[i],res.placed[j],kerf))errors.push(`${res.placed[i].item.label} overlapt ${res.placed[j].item.label}`);
   if(res.totalLen>rollL+EPS)errors.push("Benodigde lengte overschrijdt één rol.");
   lastPlan={...res,rollW,rollL,kerf,stats,project:$("#projectName").value};
   drawPlan(res,rollW);
-  $("#planStatus").innerHTML=errors.length?`<span class="warn">${esc(errors.join(". "))}</span>`:`<span class="ok">Snijplan gereed en technisch gecontroleerd.</span>`;
+  const splitMessage=splitNotices.length?`<br><span class="warn"><b>Let op – tweedelige ruiten:</b> ${splitNotices.map(esc).join(" ")}</span>`:"";
+  $("#planStatus").innerHTML=errors.length?`<span class="warn">${esc(errors.join(". "))}</span>${splitMessage}`:`<span class="ok">Snijplan gereed en technisch gecontroleerd.</span>${splitMessage}`;
   $("#planMetrics").innerHTML=`
     <div class="metric">Aantal stukken<strong>${res.placed.length}</strong></div>
     <div class="metric">Netto glasoppervlak<strong>${fmtN(stats.netArea)} m²</strong></div>
@@ -464,11 +651,12 @@ function renderPlan(res,rollW,rollL,kerf){
   calculatePrices();
 }
 $("#calculatePlan").onclick=async()=>{
-  const rollW=num($("#rollW").value),rollL=num($("#rollL").value),kerf=Math.max(0,num($("#kerf").value)||0),{items,errors}=readItems();
-  if(errors.length)return alert(errors.join("\n"));if(!(rollW>0&&rollL>0))return alert("Voer geldige rolmaten in.");
-  const tooWide=items.filter(x=>Math.min(x.w,x.canRotate?x.h:x.w)>rollW+EPS);if(tooWide.length)return alert(`Past niet op de rol: ${tooWide.map(x=>x.label).join(", ")}`);
+  const rollW=num($("#rollW").value),rollL=num($("#rollL").value),kerf=Math.max(0,num($("#kerf").value)||0);
+  if(!(rollW>0&&rollL>0))return alert("Voer geldige rolmaten in.");
+  const {items,errors,splitNotices}=readItems(rollW);
+  if(errors.length)return alert(errors.join("\n"));
   $("#calculatePlan").disabled=true;$("#progressBar").style.width="0%";
-  try{const res=await optimize(items,rollW,kerf,parseInt($("#quality").value,10));if(!res)return alert("Geen geldige indeling gevonden.");renderPlan(res,rollW,rollL,kerf)}
+  try{const res=await optimize(items,rollW,kerf,parseInt($("#quality").value,10));if(!res)return alert("Geen geldige indeling gevonden.");renderPlan(res,rollW,rollL,kerf,splitNotices)}
   finally{$("#calculatePlan").disabled=false}
 };
 
@@ -481,7 +669,7 @@ function addOtherCostRow(p={}){
   const row=document.createElement("div");
   row.className="other-cost-row";
   row.innerHTML=`<div><label>Omschrijving</label><input class="other-desc" type="text" placeholder="bijv. Reiskosten" value="${esc(p.description||"")}"></div>
-    <div><label>Bedrag excl. btw</label><input class="other-amount" type="number" step="0.01" min="0" value="${p.amount??0}"></div>
+    <div><label>Bedrag excl. btw</label><input class="other-amount" type="number" step="0.01" value="${p.amount??0}"></div>
     <button class="btn danger small remove-other" type="button">Verwijder</button>`;
   row.querySelector(".remove-other").onclick=()=>{
     row.remove();
@@ -494,8 +682,8 @@ function addOtherCostRow(p={}){
 function readOtherCosts(){
   return $$("#otherCostRows .other-cost-row").map(row=>({
     description:row.querySelector(".other-desc").value.trim(),
-    amount:Math.max(0,num(row.querySelector(".other-amount").value)||0)
-  })).filter(x=>x.description||x.amount>0);
+    amount:num(row.querySelector(".other-amount").value)||0
+  })).filter(x=>x.description||x.amount!==0);
 }
 function setOtherCosts(costs){
   $("#otherCostRows").innerHTML="";
@@ -515,17 +703,18 @@ function calculatePrices(){
   if(!lastPlan){$("#calcWarning").textContent="Bereken eerst een snijplan.";return null}
   const s=lastPlan.stats,pieces=lastPlan.placed.length,matRate=num($("#materialPrice").value)||0,cutRate=num($("#cutPrice").value)||0,mountRate=selectedMountRate();
   const matGross=s.rollArea*matRate,matDisc=matGross*(num($("#materialDiscount").value)||0)/100;
-  const cut=pieces*cutRate,mountArea=$("#mountAreaBasis").value==="gross"?s.grossArea:s.netArea;
+  const cutStart=num($("#cutStart").value)||0,cut=pieces*cutRate,mountArea=$("#mountAreaBasis").value==="gross"?s.grossArea:s.netArea;
   const mountGross=mountArea*mountRate,mountDisc=mountGross*(num($("#mountDiscount").value)||0)/100;
   const otherCosts=readOtherCosts(),other=otherCosts.reduce((sum,x)=>sum+x.amount,0);
-  const subtotal=matGross-matDisc+cut+mountGross-mountDisc+other,vat=subtotal*(num($("#vatRate").value)||0)/100,total=subtotal+vat;
-  lastCalc={matGross,matDisc,cut,mountArea,mountRate,mountGross,mountDisc,other,otherCosts,subtotal,vat,total,vatRate:num($("#vatRate").value)||0,matRate,cutRate,pieces};
+  const subtotal=matGross-matDisc+cutStart+cut+mountGross-mountDisc+other,vat=subtotal*(num($("#vatRate").value)||0)/100,total=subtotal+vat;
+  lastCalc={matGross,matDisc,cutStart,cut,mountArea,mountRate,mountGross,mountDisc,other,otherCosts,subtotal,vat,total,vatRate:num($("#vatRate").value)||0,matRate,cutRate,pieces};
   $("#calcWarning").innerHTML='<span class="ok">Calculatie bijgewerkt op basis van het actuele snijplan.</span>';
   $("#calcMetrics").innerHTML=`<div class="metric">Netto glas<strong>${fmtN(s.netArea)} m²</strong></div><div class="metric">Te factureren materiaal<strong>${fmtN(s.rollArea)} m²</strong></div><div class="metric">Aantal voorgesneden stukken<strong>${pieces}</strong></div><div class="metric">Montageklasse<strong>${mountClassText()}</strong></div>`;
-  const otherRows=otherCosts.filter(x=>x.amount>0).map(x=>`<tr><td>${esc(x.description||"Overige kosten")}</td><td>Overige kosten</td><td></td><td>${fmtMoney(x.amount)}</td></tr>`).join("");
+  const otherRows=otherCosts.filter(x=>x.amount!==0).map(x=>`<tr><td>${esc(x.description||"Overige kosten")}</td><td>Overige kosten</td><td></td><td>${fmtMoney(x.amount)}</td></tr>`).join("");
   $("#calcRows").innerHTML=`
     <tr><td>GlassShield materiaal</td><td>${fmtN(s.rollArea)} m² rolverbruik</td><td>${fmtMoney(matRate)}/m²</td><td>${fmtMoney(matGross)}</td></tr>
     ${matDisc?`<tr><td>Materiaalkorting</td><td>${fmtN(num($("#materialDiscount").value),1)}%</td><td></td><td>- ${fmtMoney(matDisc)}</td></tr>`:""}
+    <tr><td>Startkosten voorsnijden</td><td>Eenmalig</td><td></td><td>${fmtMoney(cutStart)}</td></tr>
     <tr><td>Voorsnijden</td><td>${pieces} stukken</td><td>${fmtMoney(cutRate)}/stuk</td><td>${fmtMoney(cut)}</td></tr>
     <tr><td>Montage – ${mountClassText()}</td><td>${fmtN(mountArea)} m²</td><td>${fmtMoney(mountRate)}/m²</td><td>${fmtMoney(mountGross)}</td></tr>
     ${mountDisc?`<tr><td>Montagekorting</td><td>${fmtN(num($("#mountDiscount").value),1)}%</td><td></td><td>- ${fmtMoney(mountDisc)}</td></tr>`:""}
@@ -537,7 +726,7 @@ function calculatePrices(){
   return lastCalc;
 }
 $("#recalculate").onclick=()=>{calculatePrices();calculateROI()};
-["materialPrice","cutPrice","materialDiscount","mountDiscount","vatRate","mountAreaBasis","mountSelectedPrice"].forEach(id=>$("#"+id).addEventListener("change",()=>{calculatePrices();calculateROI()}));
+["materialPrice","cutStart","cutPrice","materialDiscount","mountDiscount","vatRate","mountAreaBasis","mountSelectedPrice"].forEach(id=>$("#"+id).addEventListener("change",()=>{calculatePrices();calculateROI()}));
 
 function projectData(){
   const ids=["projectName","offerNumber","customerName","contactName","email","phone","address","city","projectDescription","projectNotes"];
@@ -549,19 +738,19 @@ function companyHeader(){
 
 const ROI_BTU_PER_U = 0.1761101838;
 const ROI_PROFILES = {
-  single:{label:"4 mm enkelglas",uBefore:5.80,uAfter:1.85,improvement:68.1,coolSave:15,gasMethod:"uvalue",
+  single:{label:"4 mm enkelglas",uBefore:5.80,uAfter:1.85,improvement:68.1,coolSave:25,gasMethod:"uvalue",
     note:"TDS-profiel: 4 mm enkelglas, Ug 5,80 → 1,85 W/m²K; verbetering 68,1%."},
-  double_pre2008:{label:"Dubbelglas (voor 2008)",uBefore:2.90,uAfter:1.40,improvement:51.7,coolSave:15,gasMethod:"uvalue",
+  double_pre2008:{label:"Dubbelglas (voor 2008)",uBefore:2.90,uAfter:1.40,improvement:51.7,coolSave:25,gasMethod:"uvalue",
     note:"TDS-profiel: dubbelglas van vóór 2008, Ug 2,90 → 1,40 W/m²K; verbetering 51,7%."},
-  triple_air:{label:"Driedubbelglas (lucht)",uBefore:2.20,uAfter:1.22,improvement:44.5,coolSave:15,gasMethod:"uvalue",
+  triple_air:{label:"Driedubbelglas (lucht)",uBefore:2.20,uAfter:1.22,improvement:44.5,coolSave:25,gasMethod:"uvalue",
     note:"TDS-profiel: driedubbelglas met lucht, Ug 2,20 → 1,22 W/m²K; verbetering 44,5%."},
-  double_lowe:{label:"Dubbelglas Low-E",uBefore:1.20,uAfter:0.83,improvement:30.8,coolSave:15,gasMethod:"uvalue",
+  double_lowe:{label:"Dubbelglas Low-E",uBefore:1.20,uAfter:0.83,improvement:30.8,coolSave:25,gasMethod:"uvalue",
     note:"TDS-profiel: dubbelglas Low-E, Ug 1,20 → 0,83 W/m²K; verbetering 30,8%."},
-  planitherm_one:{label:"Dubbelglas Planitherm One",uBefore:1.10,uAfter:0.78,improvement:28.9,coolSave:15,gasMethod:"uvalue",
+  planitherm_one:{label:"Dubbelglas Planitherm One",uBefore:1.10,uAfter:0.78,improvement:28.9,coolSave:25,gasMethod:"uvalue",
     note:"TDS-profiel: dubbelglas Planitherm One, Ug 1,10 → 0,78 W/m²K; verbetering 28,9%."},
-  skn176:{label:"Dubbelglas SKN 176",uBefore:1.10,uAfter:0.78,improvement:28.9,coolSave:15,gasMethod:"uvalue",
+  skn176:{label:"Dubbelglas SKN 176",uBefore:1.10,uAfter:0.78,improvement:28.9,coolSave:25,gasMethod:"uvalue",
     note:"TDS-profiel: dubbelglas SKN 176, Ug 1,10 → 0,78 W/m²K; verbetering 28,9%."},
-  triple_planitherm:{label:"Driedubbelglas met Planitherm One",uBefore:1.00,uAfter:0.73,improvement:27.0,coolSave:15,gasMethod:"uvalue",
+  triple_planitherm:{label:"Driedubbelglas met Planitherm One",uBefore:1.00,uAfter:0.73,improvement:27.0,coolSave:25,gasMethod:"uvalue",
     note:"TDS-profiel: driedubbelglas met Planitherm One, Ug 1,00 → 0,73 W/m²K; verbetering 27,0%."},
   custom:{label:"Eigen technische waarden",uBefore:0,uAfter:0,improvement:0,gasSave:0,coolSave:0,gasMethod:"manual",
     note:"Vul project-specifieke en technisch onderbouwde waarden in."}
@@ -659,11 +848,11 @@ function roiPDF(){
   const {jsPDF}=window.jspdf,doc=new jsPDF({unit:"mm",format:"a4"}),p=projectData(),r=lastROI;
   doc.setFont("helvetica","bold");doc.setFontSize(18);doc.text("Glass Next B.V.",15,16);doc.setFontSize(9);doc.setFont("helvetica","normal");doc.text("GlassShield ROI- en besparingsanalyse",15,22);doc.line(15,26,195,26);
   doc.setFontSize(16);doc.text(`Project: ${p.projectName}`,15,38);doc.setFontSize(10);let y=49;
-  [`Klant: ${p.customerName}`,`Glastype: ${r.glassType}`,`Glasoppervlak: ${fmtN(r.area)} m²`,`U-/Ug-waarde volgens TDS: ${fmtN(r.uBefore,2)} → ${fmtN(r.uAfter,2)} W/m²K (${fmtN(r.improvement,1)}%)`,`U-factor BTU: ${fmtN(r.btuBefore,4)} → ${fmtN(r.btuAfter,4)} | verschil ${fmtN(r.btuDelta,4)}`].forEach(t=>{doc.text(t,15,y);y+=7});
+  [`Klant: ${p.customerName}`,`Glastype: ${r.glassType}`,`Glasoppervlak: ${fmtN(r.area)} m²`,`U-/Ug-waarde volgens TDS: ${fmtN(r.uBefore,2)} → ${fmtN(r.uAfter,2)} W/m²K (${fmtN(r.improvement,1)}%)`,`U-factor BTU: ${fmtN(r.btuBefore,4)} → ${fmtN(r.btuAfter,4)} | verschil ${fmtN(r.btuDelta,4)}`].forEach(t=>{const lines=doc.splitTextToSize(t,180);doc.text(lines,15,y,{align:"left"});y+=7*lines.length});
   y+=4;doc.setFont("helvetica","bold");doc.text("Jaarlijkse besparingen",15,y);doc.setFont("helvetica","normal");y+=8;
-  [[`Gas`,`${fmtN(r.gasYear)} m³ | ${fmtMoney(r.gasValue)}`],[`Elektriciteit`,`${fmtN(r.coolYear)} kWh | ${fmtMoney(r.elecValue)}`],[`CO₂`,`${fmtN(r.co2Tons,2)} ton | ${fmtMoney(r.co2Value)}`],[`Totaal voordeel`,fmtMoney(r.totalValue)]].forEach(([a,b])=>{doc.text(a,15,y);doc.text(b,195,y,{align:"right"});y+=7});
+  [[`Gas`,`${fmtN(r.gasYear)} m³ | ${fmtMoney(r.gasValue)}`],[`Elektriciteit`,`${fmtN(r.coolYear)} kWh | ${fmtMoney(r.elecValue)}`],[`CO₂`,`${fmtN(r.co2Tons,2)} ton | ${fmtMoney(r.co2Value)}`],[`Totaal voordeel`,fmtMoney(r.totalValue)]].forEach(([a,b])=>{if(a==="CO₂"){doc.text("CO",15,y);doc.setFontSize(7);doc.text("2",21.2,y+1.4);doc.setFontSize(10)}else doc.text(a,15,y);doc.text(b,195,y,{align:"right"});y+=7});
   y+=5;doc.setFont("helvetica","bold");doc.text("Investering en terugverdientijd",15,y);doc.setFont("helvetica","normal");y+=8;
-  [[`Bruto investering`,fmtMoney(r.investment)],[`EIA/subsidievoordeel`,"- "+fmtMoney(r.eia)],[`Netto investering`,fmtMoney(r.netInvest)],[`TVT energie-only`,isFinite(r.pbtEnergy)?fmtN(r.pbtEnergy,2)+" jaar":"—"],[`TVT incl. CO₂`,isFinite(r.pbtIncl)?fmtN(r.pbtIncl,2)+" jaar":"—"],[`ROI na ${r.years} jaar`,isFinite(r.roiPct)?fmtN(r.roiPct,1)+"%":"—"]].forEach(([a,b])=>{doc.text(a,15,y);doc.text(b,195,y,{align:"right"});y+=7});
+  [[`Bruto investering`,fmtMoney(r.investment)],[`EIA/subsidievoordeel`,"- "+fmtMoney(r.eia)],[`Netto investering`,fmtMoney(r.netInvest)],[`TVT energie-only`,isFinite(r.pbtEnergy)?fmtN(r.pbtEnergy,2)+" jaar":"—"],[`TVT incl. CO2`,isFinite(r.pbtIncl)?fmtN(r.pbtIncl,2)+" jaar":"—"],[`ROI na ${r.years} jaar`,isFinite(r.roiPct)?fmtN(r.roiPct,1)+"%":"—"]].forEach(([a,b])=>{if(a==="CO₂"){doc.text("CO",15,y);doc.setFontSize(7);doc.text("2",21.2,y+1.4);doc.setFontSize(10)}else doc.text(a,15,y);doc.text(b,195,y,{align:"right"});y+=7});
   y+=10;doc.setFontSize(8);const note="Deze berekening is een scenarioanalyse. Werkelijke prestaties zijn afhankelijk van onder andere glasopbouw, oriëntatie, klimaat, installaties, bezetting, ventilatie en gebouwgebruik. De uitkomst is geen garantie.";doc.text(doc.splitTextToSize(note,180),15,y);
   doc.save(`${safe(p.projectName)}_ROI.pdf`);
 }
@@ -685,10 +874,11 @@ function renderOffer(){
     <table class="money-table"><thead><tr><th>Omschrijving</th><th>Bedrag</th></tr></thead><tbody>
     <tr><td>${fmtN(s.rollArea)} m² Nano-EcoLine Climate GlassShield à ${fmtMoney(c.matRate)}/m²</td><td>${fmtMoney(c.matGross)}</td></tr>
     ${c.matDisc?`<tr><td>Projectkorting materiaal</td><td>- ${fmtMoney(c.matDisc)}</td></tr>`:""}
+    <tr><td>Startkosten voorsnijden</td><td>${fmtMoney(c.cutStart)}</td></tr>
     <tr><td>Voorsnijden ${c.pieces} stuks à ${fmtMoney(c.cutRate)}</td><td>${fmtMoney(c.cut)}</td></tr>
     <tr><td>Aanbrengen GlassShield – montageklasse ${mountClassText()} (${fmtN(c.mountArea)} m² à ${fmtMoney(c.mountRate)}/m²)</td><td>${fmtMoney(c.mountGross)}</td></tr>
     ${c.mountDisc?`<tr><td>Projectkorting montage</td><td>- ${fmtMoney(c.mountDisc)}</td></tr>`:""}
-    ${(c.otherCosts||[]).filter(x=>x.amount>0).map(x=>`<tr><td>${esc(x.description||"Overige kosten")}</td><td>${fmtMoney(x.amount)}</td></tr>`).join("")}
+    ${(c.otherCosts||[]).filter(x=>x.amount!==0).map(x=>`<tr><td>${esc(x.description||"Overige kosten")}</td><td>${fmtMoney(x.amount)}</td></tr>`).join("")}
     <tr class="total-row"><td>Totaal excl. btw</td><td>${fmtMoney(c.subtotal)}</td></tr><tr><td>${fmtN(c.vatRate,1)}% btw</td><td>${fmtMoney(c.vat)}</td></tr><tr class="grand-row"><td>Totaal incl. btw</td><td>${fmtMoney(c.total)}</td></tr></tbody></table>
     <h3>Werkzaamheden montage</h3><ul><li>Bevochtigen en reinigen van de glasoppervlakken</li><li>Voorbereiden en positioneren van GlassShield</li><li>Verwijderen van vocht en luchtinsluitingen</li><li>Schoonsnijden en afwerken van de folie</li><li>Reinigen van glas, kozijnen en vensterbanken</li></ul>
     ${p.projectNotes?`<h3>Bijzonderheden</h3><p>${esc(p.projectNotes)}</p>`:""}
@@ -731,12 +921,81 @@ function downloadBlob(blob,name){const a=document.createElement("a");a.href=URL.
 function downloadPNG(){if(!lastPlan)return alert("Maak eerst een snijplan.");$("#planCanvas").toBlob(b=>downloadBlob(b,`${safe($("#projectName").value)}_snijplan.png`))}
 function requirePDF(){if(!window.jspdf?.jsPDF){alert("PDF-module kon niet worden geladen. Controleer de internetverbinding en open de app opnieuw.");return false}return true}
 function planPDF(){
-  if(!lastPlan)return alert("Maak eerst een snijplan.");if(!requirePDF())return;
-  const {jsPDF}=window.jspdf,doc=new jsPDF({unit:"mm",format:"a4"}),r=lastPlan,pageW=210,left=15,top=28,drawW=180,drawH=245,scale=drawW/r.rollW,seg=drawH/scale,pages=Math.max(1,Math.ceil(r.totalLen/seg));
-  for(let page=0;page<pages;page++){if(page)doc.addPage();const y0=page*seg,y1=Math.min(r.totalLen,(page+1)*seg);doc.setFontSize(14);doc.text(`GlassNext snijplan – ${r.project}`,left,12);doc.setFontSize(9);doc.text(`Pagina ${page+1}/${pages} | segment ${fmtN(y0/1000)}–${fmtN(y1/1000)} m | rolbreedte ${r.rollW} mm`,left,19);doc.rect(left,top,drawW,(y1-y0)*scale);
-    r.placed.forEach(p=>{const py0=Math.max(p.y,y0),py1=Math.min(p.y+p.h,y1);if(py1<=py0)return;const x=left+p.x*scale,y=top+(py0-y0)*scale,w=p.w*scale,h=(py1-py0)*scale;doc.setFillColor(225,235,245);doc.rect(x,y,w,h,"FD");if(p.y>=y0&&p.y<y1&&w>12&&h>5){doc.setFontSize(6.5);const netTxt=`Netto ${fmtN(p.item.netW/10,1)} × ${fmtN(p.item.netH/10,1)} cm`;const grossTxt=`Bruto ${fmtN(p.item.w/10,1)} × ${fmtN(p.item.h/10,1)} cm`;doc.text([`${p.item.label}${p.rotated?" R":""}`,netTxt,grossTxt],x+1.2,y+3.2,{maxWidth:Math.max(1,w-2.4),lineHeightFactor:1.05})}});
-    doc.setFontSize(8);doc.text(`Rollengte ${fmtN(r.totalLen/1000)} m | roloppervlak ${fmtN(r.stats.rollArea)} m² | snijverlies ${fmtN(r.stats.wasteArea)} m² (${fmtN(r.stats.loss,1)}%)`,left,285)}
-  doc.save(`${safe(r.project)}_snijplan.pdf`);
+  if(!lastPlan)return alert("Maak eerst een snijplan.");
+  const r=lastPlan;
+
+  // Productie-PDF voor Zünd: één doorlopende pagina op ware grootte (100%).
+  // Alleen de contouren van de snijstukken worden getekend; er is géén buitencontour van de rol.
+  // De contouren gebruiken een Separation/spot color met de exacte naam CutContour.
+  // De PDF bevat daarnaast een Optional Content Group (laag) met de naam CutContour.
+  // Het stuknummer staat als zwarte tekst in de snijrand en valt binnen dezelfde PDF-laag,
+  // maar gebruikt bewust NIET de CutContour-steunkleur zodat de snijmachine de letters niet als snijlijn ziet.
+
+  const MM_TO_PT=72/25.4;
+  const physicalWpt=r.rollW*MM_TO_PT;
+  const physicalHpt=Math.max(1,r.totalLen)*MM_TO_PT;
+  // Houd de PDF user-space binnen ca. 14.000 pt voor compatibiliteit met grote pagina's.
+  // /UserUnit zorgt dat de uiteindelijke fysieke maat toch exact 100% blijft.
+  const userUnit=Math.max(1,physicalWpt/14000,physicalHpt/14000);
+  const pageW=physicalWpt/userUnit,pageH=physicalHpt/userUnit;
+  const ptPerMm=MM_TO_PT/userUnit;
+
+  const n=v=>Number(v).toFixed(4).replace(/0+$/,'').replace(/\.$/,'');
+  const pdfEsc=t=>String(t).replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)");
+  const labelFor=p=>p.item.label; // uitsluitend raam-/stuknummer, geen maatvoering
+
+  let content="/OC /CUT BDC\n";
+  // CutContour als spot color. Tint 1 = volle steunkleur; alternate CMYK = 0/100/0/0 (magenta preview).
+  content+="/CSCUT CS 1 SCN\n";
+  // Haarlijn/vectorcontour; de Zünd/RIP gebruikt de CutContour-spotkleur als snijlijn.
+  content+="0 w 0 J 0 j\n";
+  [...r.placed].sort((a,b)=>a.y-b.y||a.x-b.x).forEach(p=>{
+    const x=p.x*ptPerMm;
+    const y=pageH-(p.y+p.h)*ptPerMm;
+    const w=p.w*ptPerMm,h=p.h*ptPerMm;
+    content+=`${n(x)} ${n(y)} ${n(w)} ${n(h)} re S\n`;
+  });
+
+  // Kenmerken in de snijrand: zwart, dus zichtbaar voor de plakker maar geen CutContour-snijpad.
+  content+="0 G /F1 "+n(10/userUnit)+" Tf\n";
+  [...r.placed].sort((a,b)=>a.y-b.y||a.x-b.x).forEach(p=>{
+    const margin=Math.max(0,Number(p.item.margin)||0);
+    // Plaats in de bovenste snijrand. Bij een zeer kleine snijrand blijft het kenmerk net binnen het stuk.
+    const insetX=Math.min(Math.max(3,margin*0.18),Math.max(3,p.w/4));
+    const insetY=Math.min(Math.max(3,margin*0.22),Math.max(3,p.h/4));
+    const tx=(p.x+insetX)*ptPerMm;
+    const ty=pageH-(p.y+insetY)*ptPerMm;
+    content+=`BT ${n(tx)} ${n(ty)} Td (${pdfEsc(labelFor(p))}) Tj ET\n`;
+  });
+  content+="EMC\n";
+
+  const enc=new TextEncoder();
+  const streamBytes=enc.encode(content);
+  const objects=[];
+  const add=x=>{objects.push(x);return objects.length};
+  const catalog=add("");
+  const pages=add("");
+  const page=add("");
+  const stream=add(`<< /Length ${streamBytes.length} >>\nstream\n${content}endstream`);
+  const font=add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  const sep=add("[/Separation /CutContour /DeviceCMYK << /FunctionType 2 /Domain [0 1] /C0 [0 0 0 0] /C1 [0 1 0 0] /N 1 >>]");
+  const ocg=add("<< /Type /OCG /Name (CutContour) >>");
+  objects[catalog-1]=`<< /Type /Catalog /Pages ${pages} 0 R /OCProperties << /OCGs [${ocg} 0 R] /D << /Order [${ocg} 0 R] /ON [${ocg} 0 R] >> >> >>`;
+  objects[pages-1]=`<< /Type /Pages /Kids [${page} 0 R] /Count 1 >>`;
+  objects[page-1]=`<< /Type /Page /Parent ${pages} 0 R /MediaBox [0 0 ${n(pageW)} ${n(pageH)}] /UserUnit ${n(userUnit)} /Resources << /Font << /F1 ${font} 0 R >> /ColorSpace << /CSCUT ${sep} 0 R >> /Properties << /CUT ${ocg} 0 R >> >> /Contents ${stream} 0 R >>`;
+
+  let pdf="%PDF-1.6\n%GlassNext CutContour production PDF\n";
+  const offsets=[0];
+  for(let i=0;i<objects.length;i++){
+    offsets.push(enc.encode(pdf).length);
+    pdf+=`${i+1} 0 obj\n${objects[i]}\nendobj\n`;
+  }
+  const xref=enc.encode(pdf).length;
+  pdf+=`xref\n0 ${objects.length+1}\n0000000000 65535 f \n`;
+  for(let i=1;i<=objects.length;i++)pdf+=String(offsets[i]).padStart(10,"0")+" 00000 n \n";
+  pdf+=`trailer\n<< /Size ${objects.length+1} /Root ${catalog} 0 R >>\nstartxref\n${xref}\n%%EOF`;
+
+  downloadBlob(new Blob([enc.encode(pdf)],{type:"application/pdf"}),`${safe(r.project)}_CutContour_100pct.pdf`);
 }
 function docToPDF(type){
   if(!requirePDF())return;type==="offer"?renderOffer():renderWorkorder();
@@ -747,7 +1006,7 @@ function docToPDF(type){
     doc.setFontSize(16);doc.text(`Offerte ${p.offerNumber||""}`,15,37);doc.setFontSize(10);
     const lines=[`Klant: ${p.customerName}`,`Project: ${p.projectName}`,`Adres: ${[p.address,p.city].filter(Boolean).join(", ")}`,`Aantal ruiten: ${c.pieces}`,`Netto glasoppervlak: ${fmtN(s.netArea)} m²`,`Benodigd roloppervlak: ${fmtN(s.rollArea)} m²`,`Benodigde rollengte: ${fmtN(lastPlan.totalLen/1000)} m`,`Snijverlies: ${fmtN(s.wasteArea)} m² (${fmtN(s.loss,1)}%)`];let y=47;lines.forEach(t=>{doc.text(t,15,y);y+=6});
     y+=5;doc.setFont("helvetica","bold");doc.text("Investering",15,y);doc.setFont("helvetica","normal");y+=8;
-    const offerCostRows=[[`GlassShield materiaal`,c.matGross],[`Materiaalkorting`,-c.matDisc],[`Voorsnijden (${c.pieces} stuks)`,c.cut],[`Montage – ${mountClassText()}`,c.mountGross],[`Montagekorting`,-c.mountDisc],...(c.otherCosts||[]).map(x=>[x.description||"Overige kosten",x.amount])];
+    const offerCostRows=[[`GlassShield materiaal`,c.matGross],[`Materiaalkorting`,-c.matDisc],[`Startkosten voorsnijden`,c.cutStart],[`Voorsnijden (${c.pieces} stuks)`,c.cut],[`Montage – ${mountClassText()}`,c.mountGross],[`Montagekorting`,-c.mountDisc],...(c.otherCosts||[]).map(x=>[x.description||"Overige kosten",x.amount])];
     offerCostRows.filter(x=>Math.abs(x[1])>.001).forEach(([t,v])=>{doc.text(String(t),15,y,{maxWidth:145});doc.text(fmtMoney(v),195,y,{align:"right"});y+=7});
     doc.line(15,y,195,y);y+=7;doc.setFont("helvetica","bold");doc.text("Totaal excl. btw",15,y);doc.text(fmtMoney(c.subtotal),195,y,{align:"right"});y+=7;doc.setFont("helvetica","normal");doc.text(`${fmtN(c.vatRate,1)}% btw`,15,y);doc.text(fmtMoney(c.vat),195,y,{align:"right"});y+=8;doc.setFont("helvetica","bold");doc.text("Totaal incl. btw",15,y);doc.text(fmtMoney(c.total),195,y,{align:"right"});
     doc.save(`${safe(p.projectName)}_offerte.pdf`);
@@ -764,45 +1023,28 @@ function docToPDF(type){
 $("#exportCSVTop").onclick=downloadCSV;$("#exportCSV").onclick=downloadCSV;$("#exportPNG").onclick=downloadPNG;$("#planPDF").onclick=planPDF;$("#exportPlanPDF").onclick=planPDF;$("#offerPDF").onclick=()=>docToPDF("offer");$("#workPDF").onclick=()=>docToPDF("work");
 
 function collectProject(){
-  const inputIds=["projectName","offerNumber","customerName","contactName","email","phone","address","city","projectDescription","projectNotes","rollW","rollL","marginSide","kerf","quality","rotateDefault","materialPrice","cutPrice","materialDiscount","mountDiscount","vatRate","mountClass","mountAreaBasis","mountSelectedPrice","roiGlassType","roiAreaSource","roiArea","roiGasMethod","roiUBefore","roiUAfter","roiHDD","roiBoilerEff","roiGasKwh","roiGasSaveM2","roiCoolSaveM2","roiBuildingFactor","roiInvestmentSource","roiInvestment","roiEiaNet","roiGasPrice","roiElecPrice","roiCO2Price","roiCO2Gas","roiCO2Elec","roiYears","includeROIInOffer"];
+  const inputIds=["projectName","offerNumber","customerName","contactName","email","phone","address","city","projectDescription","projectNotes","rollW","rollL","marginSide","kerf","quality","rotateDefault","materialPrice","cutStart","cutPrice","materialDiscount","mountDiscount","vatRate","mountClass","mountAreaBasis","mountSelectedPrice","roiGlassType","roiAreaSource","roiArea","roiGasMethod","roiUBefore","roiUAfter","roiHDD","roiBoilerEff","roiGasKwh","roiGasSaveM2","roiCoolSaveM2","roiBuildingFactor","roiInvestmentSource","roiInvestment","roiEiaNet","roiGasPrice","roiElecPrice","roiCO2Price","roiCO2Gas","roiCO2Elec","roiYears","includeROIInOffer"];
   const values=Object.fromEntries(inputIds.map(id=>[id,$("#"+id).type==="checkbox"?$("#"+id).checked:$("#"+id).value]));
   const panes=$$("#paneTable tbody tr").map(tr=>({id:tr.querySelector(".pid").value,w:tr.querySelector(".pw").value,h:tr.querySelector(".ph").value,n:tr.querySelector(".pn").value,rot:tr.querySelector(".prot").value,room:tr.querySelector(".proom").value}));
   return{version:"GlassNext Suite v4.2",savedAt:new Date().toISOString(),values,panes,otherCosts:readOtherCosts()};
 }
 function saveProject(){downloadBlob(new Blob([JSON.stringify(collectProject(),null,2)],{type:"application/json"}),`${safe($("#projectName").value)}_GlassNext.json`)}
 function openProjectFile(file){
-  const reader=new FileReader();reader.onload=()=>{let raw="",d=null;try{
-    raw=String(reader.result||"").replace(/^\uFEFF/,"").trim();
-    // Fix: workorderData may contain unescaped inner JSON (WP bug). Remove it before parsing.
-    const wdStart=raw.indexOf('"workorderData":');
-    if(wdStart!==-1){
-      const wdEnd=raw.indexOf(',"exportData"',wdStart);
-      if(wdEnd!==-1)raw=raw.substring(0,wdStart)+raw.substring(wdEnd+1);
-    }
-    console.log("openProjectFile:", file.name, raw.substring(0,200));
-    d=JSON.parse(raw);
-    console.log("parsed:", d);
-    const v=d.values||{};
-    const textIds=["projectName","offerNumber","customerName","contactName","email","phone","address","city","projectDescription","projectNotes","rollW","rollL","marginSide","kerf","materialPrice","cutPrice","materialDiscount","mountDiscount","vatRate","mountSelectedPrice","roiArea","roiGasSaveM2","roiCoolSaveM2","roiBuildingFactor","roiInvestment","roiEiaNet","roiGasPrice","roiElecPrice","roiCO2Price","roiCO2Gas","roiCO2Elec","roiYears"];
-    textIds.forEach(id=>{const el=$("#"+id);if(el&&v[id]!=null)el.value=v[id]});
-    const selectIds=["quality","rotateDefault","mountClass","mountAreaBasis","roiGlassType","roiAreaSource","roiGasMethod","roiInvestmentSource"];
-    selectIds.forEach(id=>{const el=$("#"+id);if(el&&v[id]!=null){[...el.options].forEach(o=>o.selected=o.value===String(v[id]))}});
-    const roiTextIds=["roiUBefore","roiUAfter","roiHDD","roiBoilerEff","roiGasKwh"];
-    roiTextIds.forEach(id=>{const el=$("#"+id);if(el&&v[id]!=null)el.value=v[id]});
-    const cb=$("#includeROIInOffer");if(cb&&typeof v.includeROIInOffer==="boolean")cb.checked=v.includeROIInOffer;
+  const reader=new FileReader();reader.onload=()=>{try{
+    const d=JSON.parse(reader.result);
+    Object.entries(d.values||{}).forEach(([id,v])=>{if($("#"+id)){if($("#"+id).type==="checkbox")$("#"+id).checked=!!v;else $("#"+id).value=v}});
     // Compatibiliteit met oudere v4.1-projectbestanden
-    if(!v.mountSelectedPrice){
-      const cls=v.mountClass||"average";
-      const oldMap={easy:v.priceEasy,average:v.priceAverage,complex:v.priceComplex,very:v.priceVery};
+    if(!d.values?.mountSelectedPrice){
+      const cls=d.values?.mountClass||"average";
+      const oldMap={easy:d.values?.priceEasy,average:d.values?.priceAverage,complex:d.values?.priceComplex,very:d.values?.priceVery};
       $("#mountSelectedPrice").value=(num(oldMap[cls])||MOUNT_DEFAULT_RATES[cls]||45).toFixed(2);
-    }else{
-      const msp=num(v.mountSelectedPrice);if(msp>0)$("#mountSelectedPrice").value=msp.toFixed(2);
     }
+    if(d.values?.cutStart===undefined)$("#cutStart").value="25.00";
     if(Array.isArray(d.otherCosts))setOtherCosts(d.otherCosts);
-    else if(v && num(v.otherCost)>0)setOtherCosts([{description:"Overige projectkosten",amount:num(v.otherCost)}]);
+    else if(d.values && num(d.values.otherCost)>0)setOtherCosts([{description:"Overige projectkosten",amount:num(d.values.otherCost)}]);
     else setOtherCosts([]);
     paneBody.innerHTML="";(d.panes||[]).forEach(addPaneRow);lastPlan=null;lastCalc=null;lastROI=null;$("#planMetrics").innerHTML="";$("#pieceReport").textContent="Project geopend. Bereken het snijplan opnieuw.";activatePage("project")
-  }catch(e){console.error(e,d,raw);const pos=e.message.match(/position (\d+)/);let ctx="";if(pos){const p=parseInt(pos[1]);ctx="\n\nRond positie "+p+":\n"+raw.substring(Math.max(0,p-40),p+40);}alert("Dit projectbestand kon niet worden geopend: "+e.message+ctx+"\n\nKijk in de browserconsole (F12 > Console) voor de ruwe data.");}};reader.readAsText(file);
+  }catch(e){console.error(e);alert("Dit projectbestand kon niet worden geopend.")}};reader.readAsText(file);
 }
 $("#projectFile").onchange=e=>{if(e.target.files[0])openProjectFile(e.target.files[0]);e.target.value=""};
 $("#saveProject").onclick=saveProject;$("#exportProject").onclick=saveProject;$("#loadProject").onclick=()=>$("#projectFile").click();$("#importProject").onclick=()=>$("#projectFile").click();
