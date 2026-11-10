@@ -21,6 +21,24 @@ class GND_Quotes {
         add_action('wp_ajax_gnd_submit_quote', [$this, 'ajax_submit']);
         add_action('wp_ajax_gnd_list_quotes', [$this, 'ajax_list']);
         add_action('wp_ajax_gnd_retry_odoo', [$this, 'ajax_retry']);
+        add_action('wp_ajax_gnd_refresh_nonce', [$this, 'ajax_refresh_nonce']);
+        add_action('wp_ajax_nopriv_gnd_refresh_nonce', [$this, 'ajax_refresh_nonce']);
+    }
+
+    /**
+     * Nieuwe nonce voor een app die lang open heeft gestaan (nonces verlopen na 12–24 uur).
+     * Geeft alleen een nonce terug aan een ingelogde gebruiker met toegang; dat lekt niets,
+     * want een andere site kan het antwoord niet uitlezen (same-origin).
+     */
+    public function ajax_refresh_nonce() {
+        nocache_headers();
+        if (!is_user_logged_in()) {
+            wp_send_json_error(['message' => 'Je sessie is verlopen. Log opnieuw in.', 'loggedOut' => true], 401);
+        }
+        if (!GlassNext_Dealer_Suite::user_can_access()) {
+            wp_send_json_error(['message' => 'Geen toegang.'], 403);
+        }
+        wp_send_json_success(['nonce' => wp_create_nonce('gnd_quote')]);
     }
 
     private function guard() {
