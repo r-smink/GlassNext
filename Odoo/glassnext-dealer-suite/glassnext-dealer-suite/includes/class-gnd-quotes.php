@@ -65,6 +65,44 @@ class GND_Quotes {
             wp_send_json_error(['message' => 'Ongeldige projectgegevens ontvangen.']);
         }
 
+        // Idempotent: een offerte uit de wachtrij die al eens is aangekomen (bijv. verbinding viel weg
+        // tijdens het antwoord) wordt niet opnieuw aangemaakt, maar het bestaande resultaat teruggegeven.
+        $client_id = substr(preg_replace('/[^A-Za-z0-9-]/', '', (string) ($data['clientId'] ?? '')), 0, 64);
+        if (strlen($client_id) >= 8) {
+            $existing = get_posts([
+                'post_type'      => 'gn_submission',
+                'post_status'    => 'any',
+                'posts_per_page' => 1,
+                'fields'         => 'ids',
+                'meta_query'     => [
+                    ['key' => '_gnd_client_id', 'value' => $client_id],
+                    ['key' => '_gnd_user_id', 'value' => get_current_user_id()],
+                ],
+            ]);
+            if ($existing) {
+                $pid = (int) $existing[0];
+                $order_id = get_post_meta($pid, '_gn_odoo_order_id', true);
+                if ($order_id && !get_post_meta($pid, '_gn_odoo_error', true)) {
+                    $odoo = ['success' => true, 'orderId' => (int) $order_id, 'orderName' => get_post_meta($pid, '_gnd_odoo_order_name', true),
+                        'url' => current_user_can('manage_options') ? $this->odoo_order_url($order_id) : '', 'error' => null];
+                } elseif ($order_id) {
+                    $odoo = ['success' => false, 'orderId' => (int) $order_id, 'orderName' => '', 'url' => '', 'error' => get_post_meta($pid, '_gn_odoo_error', true)];
+                } else {
+                    $odoo = $this->sync_to_odoo($pid);
+                }
+                wp_send_json_success([
+                    'offerNumber' => get_post_meta($pid, '_gn_offer_number', true),
+                    'postId'      => $pid,
+                    'odoo'        => $odoo,
+                    'duplicate'   => true,
+                ]);
+            }
+        }
+        $created_at = '';
+        if (!empty($data['createdAt']) && ($ts = strtotime((string) $data['createdAt']))) {
+            $created_at = wp_date('Y-m-d H:i:s', $ts);
+        }
+
         $c = is_array($data['customer'] ?? null) ? $data['customer'] : [];
         $customer = [
             'customerName' => sanitize_text_field($c['customerName'] ?? ''),
@@ -124,6 +162,7 @@ class GND_Quotes {
             'source'       => 'dealer',
             'offerNumber'  => $offer_number,
             'submittedAt'  => current_time('mysql'),
+            'createdAt'    => $created_at, // moment van aanmaken op het toestel (kan eerder zijn bij offline)
             'dealer'       => ['id' => $user->ID, 'name' => $user->display_name, 'email' => $user->user_email],
             'customer'     => $customer,
             'installMode'  => $install_mode,
@@ -187,6 +226,7 @@ class GND_Quotes {
         update_post_meta($post_id, '_gn_install_mode', $install_mode);
         update_post_meta($post_id, '_gn_source', 'dealer');
         update_post_meta($post_id, '_gnd_user_id', $user->ID);
+        if (strlen($client_id) >= 8) update_post_meta($post_id, '_gnd_client_id', $client_id);
 
         // Bijlagen: origineel importbestand, snijplan-CSV en snijplan-PDF.
         $attachment_ids = [];
@@ -419,7 +459,9 @@ class GND_Quotes {
 
         $h  = '<div style="font-family:Arial,sans-serif;font-size:13px">';
         $h .= '<h3 style="margin:0 0 6px;color:#2c3e50">GlassNext Dealer Offerte — ' . $e($rec['offerNumber']) . '</h3>';
-        $h .= '<p style="margin:0 0 10px;color:#718096;font-size:12px">Aangemaakt op ' . $e($rec['submittedAt']) . ' door ' . $e($rec['dealer']['name']) . ' (' . $e($rec['dealer']['email']) . ')' . ($rec['importFile'] ? ' — import: ' . $e($rec['importFile']) : '') . '</p>';
+        $h .= '<p style="margin:0 0 10px;color:#718096;font-size:12px">Aangemaakt op ' . $e($rec['submittedAt'])
+            . (!empty($rec['createdAt']) && abs(strtotime($rec['createdAt']) - strtotime($rec['submittedAt'])) > 300 ? ' (offline gemaakt op ' . $e($rec['createdAt']) . ')' : '')
+            . ' door ' . $e($rec['dealer']['name']) . ' (' . $e($rec['dealer']['email']) . ')' . ($rec['importFile'] ? ' — import: ' . $e($rec['importFile']) : '') . '</p>';
         $h .= $h4('Klant') . '<table style="border-collapse:collapse">';
         foreach ([['Klant / organisatie', $c['customerName']], ['Contactpersoon', $c['contactName']], ['E-mail', $c['email']], ['Telefoon', $c['phone']], ['Adres', $c['address']], ['Postcode / plaats', $c['city']], ['Referentie dealer', $c['reference']], ['Omschrijving', $c['description']], ['Bijzonderheden', $c['notes']]] as $r) {
             if ($r[1] !== '') $h .= $row($r[0], $r[1]);

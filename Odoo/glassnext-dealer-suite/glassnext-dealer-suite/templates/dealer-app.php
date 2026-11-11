@@ -12,12 +12,16 @@ $gnd_admin = current_user_can('manage_options');
     </div>
     <nav class="gnd-tabs" aria-label="Hoofdmenu">
       <button type="button" class="gnd-tab is-active" data-tab="new"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Nieuw</span></button>
-      <button type="button" class="gnd-tab" data-tab="list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg><span>Offertes</span></button>
+      <button type="button" class="gnd-tab" data-tab="list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg><span>Offertes</span><b class="gnd-tab-badge gnd-hidden" id="gndOutboxBadge" aria-label="in wachtrij"></b></button>
       <button type="button" class="gnd-tab" data-tab="account"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Account</span></button>
     </nav>
   </header>
 
-  <div class="gnd-offline gnd-hidden" id="gndOffline" role="status">Geen verbinding. Je invoer wordt op dit toestel bewaard; versturen kan zodra je weer online bent.</div>
+  <div class="gnd-offline gnd-hidden" id="gndOffline" role="status">Geen verbinding. Je kunt gewoon doorwerken: offertes worden in de wachtrij op dit toestel bewaard en verstuur je zodra je weer online bent.</div>
+  <div class="gnd-outbar gnd-hidden" id="gndOutboxBar" role="status">
+    <span id="gndOutboxBarText"></span>
+    <button type="button" class="gnd-btn gnd-small" id="gndOutboxSendAll">Nu versturen</button>
+  </div>
   <div class="gnd-toast gnd-hidden" id="gndToast" role="status" aria-live="polite"></div>
 
   <main class="gnd-main">
@@ -150,6 +154,7 @@ $gnd_admin = current_user_can('manage_options');
 
     <!-- ================= OFFERTES ================= -->
     <section class="gnd-view" data-view-pane="list" hidden>
+      <div id="gndOutbox" class="gnd-outbox gnd-pad" hidden></div>
       <div class="gnd-row-head gnd-pad"><h2><?php echo $gnd_admin ? 'Dealerofferte’s' : 'Mijn offertes'; ?></h2>
         <button type="button" class="gnd-btn gnd-btn-light gnd-small" id="gndRefreshList">Vernieuwen</button></div>
       <div id="gndList" class="gnd-list"><span class="gnd-note">Laden…</span></div>

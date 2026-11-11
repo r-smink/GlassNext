@@ -71,7 +71,13 @@ Dealers die "Ingelogd blijven" aanvinken blijven 30 dagen ingelogd (beheerders: 
   het kenmerk (R1, R2…) wordt automatisch opgehoogd, ruimte en rotatie blijven staan.
 - **Concept wordt automatisch op het toestel bewaard** (per gebruiker) en hersteld bij openen.
   Na versturen of "Wissen" wordt het concept verwijderd.
-- **Offline:** invoeren en snijplan berekenen werkt zonder verbinding; versturen pas weer online.
+- **Offline / wachtrij:** invoeren en snijplan berekenen werkt zonder verbinding. "Versturen" zet de
+  offerte dan in de **wachtrij** op het toestel (met snijplan-PDF en importbestand tot 1,5 MB). Ook als
+  de verbinding tijdens het versturen wegvalt, komt de offerte in de wachtrij. Weer online: balk
+  "Nu versturen" bovenin, en bij **Offertes** per offerte *Versturen* / *Verwijderen*. Elke offerte heeft
+  een unieke `clientId`; de server maakt per `clientId` maar één offerte aan, dus opnieuw versturen
+  geeft nooit een dubbele offerte in WordPress of Odoo. In de Odoo-chatter staat bij offline gemaakte
+  offertes het oorspronkelijke tijdstip.
 - **Sessie verlopen:** de app ververst zelf de beveiligingssleutel; is de login verlopen, dan vraagt
   de app opnieuw in te loggen — het concept blijft bewaard.
 

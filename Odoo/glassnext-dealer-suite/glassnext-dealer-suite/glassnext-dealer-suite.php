@@ -2,7 +2,7 @@
 /**
  * Plugin Name: GlassNext Dealer Suite
  * Description: Afgeschermde mobiele webapp (PWA) voor dealers en beheerders: ruitmaten invoeren of importeren (CSV/XLSX), snijplan berekenen en direct als offerte naar Odoo sturen. Gebruikt de instellingen en Odoo-koppeling van de GlassNext Suite. App: /dealers/ — shortcode: [glassnext_dealer_suite]
- * Version: 1.1.5
+ * Version: 1.1.6
  * Author: GlassNext
  * Requires Plugins: glassnext-suite
  * Text Domain: glassnext-dealer-suite
@@ -10,7 +10,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('GND_VERSION', '1.1.5');
+define('GND_VERSION', '1.1.6');
 define('GND_PLUGIN_FILE', __FILE__);
 define('GND_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('GND_PLUGIN_URL', plugin_dir_url(__FILE__));

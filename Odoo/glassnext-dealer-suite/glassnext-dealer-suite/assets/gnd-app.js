@@ -330,7 +330,7 @@ async function calculatePlan(){
     $("#gndPlanArea").classList.remove("gnd-hidden");$("#gndCalcCard").classList.remove("gnd-hidden");
     calculatePrices();
     return true;
-  }finally{busy=false;$("#gndCalculate").disabled=false;$("#gndSubmit").disabled=!navigator.onLine||submitted;$("#gndNext").disabled=false}
+  }finally{busy=false;$("#gndCalculate").disabled=false;$("#gndSubmit").disabled=submitted;$("#gndNext").disabled=false}
 }
 $("#gndCalculate").onclick=calculatePlan;
 
@@ -407,15 +407,124 @@ async function ajax(action,build,retried=false){
   if(!retried&&(text.trim()==="-1"||text.trim()==="0"||r.status===403&&!/^\s*\{/.test(text))){
     await refreshNonce();return ajax(action,build,true);
   }
-  let j;try{j=JSON.parse(text)}catch(e){throw Error(`Onverwacht antwoord van de server (HTTP ${r.status}).`)}
+  let j;try{j=JSON.parse(text)}catch(e){const er=Error(`Onverwacht antwoord van de server (HTTP ${r.status}).`);er.network=r.status===0||r.status>=500;throw er}
   return j;
 }
+/** Geen (goede) verbinding: fetch faalt (TypeError) of een gateway/wifi-portal geeft geen JSON. */
+const isNetErr=err=>err instanceof TypeError||!!err?.network;
 function sessionExpired(err){
   if(!(err instanceof SessionError))return false;
   saveDraft();
   if(confirm(err.message+"\n\nJe invoer is op dit toestel bewaard. Nu opnieuw inloggen?"))location.href=CFG.appUrl||location.href;
   return true;
 }
+
+/* ---------------- Wachtrij: offline gemaakte offertes ----------------
+ * Elke offerte krijgt een clientId; de server maakt per clientId maar één offerte aan,
+ * dus opnieuw versturen na een weggevallen verbinding geeft nooit een dubbele offerte. */
+const outbox={
+  key:"gnd_outbox_"+(CFG.user?.id||0),
+  all(){try{const l=JSON.parse(localStorage.getItem(this.key)||"[]");return Array.isArray(l)?l:[]}catch(e){return[]}},
+  save(l){if(l.length)localStorage.setItem(this.key,JSON.stringify(l));else localStorage.removeItem(this.key)}, // kan QuotaExceeded gooien
+  add(item){this.save([...this.all(),item])},
+  update(cid,patch){try{this.save(this.all().map(x=>x.cid===cid?{...x,...patch}:x))}catch(e){}},
+  remove(cid){try{this.save(this.all().filter(x=>x.cid!==cid))}catch(e){}}
+};
+const MAX_QUEUED_FILE=1.5*1024*1024;
+const newCid=()=>{try{if(crypto.randomUUID)return crypto.randomUUID()}catch(e){}return Date.now().toString(36)+"-"+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2)};
+const fileToDataUrl=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(f)});
+function dataUrlToFile(u,name){
+  const [head,b64]=String(u).split(",");const type=(head.match(/^data:([^;]+)/)||[])[1]||"application/octet-stream";
+  const bin=atob(b64||"");const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+  return new File([arr],name||"import",{type});
+}
+/** Verstuurt één offerte (direct of uit de wachtrij). Gooit bij fouten; err.server = afgewezen door de server. */
+async function sendEntry(e){
+  let file=e.file instanceof File?e.file:null;
+  if(!file&&e.fileData){try{file=dataUrlToFile(e.fileData,e.fileName)}catch(err){file=null}}
+  const resp=await ajax("gnd_submit_quote",fd=>{
+    fd.append("project_json",JSON.stringify(e.payload));
+    if(file)fd.append("import_file",file,file.name);
+    if(e.pdf)fd.append("plan_pdf",e.pdf);
+  });
+  if(!resp.success){const er=Error(resp.data?.message||"Onbekende fout.");er.server=true;throw er}
+  return resp.data;
+}
+/** Zet een offerte in de wachtrij. Geeft true terug als het lukte. */
+async function queueEntry(e){
+  const item={cid:e.cid,createdAt:e.createdAt,customerName:e.customerName,reference:e.reference,pieces:e.pieces,rollArea:e.rollArea,
+    payload:e.payload,pdf:e.pdf||null,fileName:e.file?.name||"",fileData:null,fileSkipped:false,lastError:""};
+  if(e.file){
+    if(e.file.size<=MAX_QUEUED_FILE){try{item.fileData=await fileToDataUrl(e.file)}catch(err){item.fileSkipped=true}}
+    else item.fileSkipped=true;
+  }
+  // Bij een vol toestelgeheugen eerst bijlagen laten vallen; de ruitmaten en het snijplan zelf zijn het belangrijkst.
+  for(const strip of [[],["fileData"],["fileData","pdf"]]){
+    const it={...item};strip.forEach(k=>{it[k]=null});if(strip.includes("fileData")&&item.fileData)it.fileSkipped=true;
+    try{outbox.add(it);updateOutboxUi();return true}catch(err){}
+  }
+  return false;
+}
+let outboxBusy=false;
+async function sendOutbox(only=null){
+  if(outboxBusy)return;
+  if(!navigator.onLine){toast("Geen verbinding. Probeer het zodra je online bent.",3000);return}
+  const items=outbox.all().filter(x=>!only||x.cid===only);
+  if(!items.length)return;
+  outboxBusy=true;updateOutboxUi();
+  let sent=0,failed=0,stopped="";
+  for(const it of items){
+    const card=document.querySelector(`[data-outbox="${CSS.escape(it.cid)}"]`);
+    if(card)card.querySelector(".gnd-q-err").textContent="Bezig met versturen…";
+    try{
+      const d=await sendEntry(it);
+      outbox.remove(it.cid);sent++;
+      if(d.odoo&&!d.odoo.success)failed++; // staat wel in WordPress; Odoo opnieuw via de lijst
+    }catch(err){
+      if(err instanceof SessionError){outboxBusy=false;updateOutboxUi();sessionExpired(err);return}
+      if(isNetErr(err)){stopped="Verbinding viel weg; de rest blijft in de wachtrij.";break}
+      outbox.update(it.cid,{lastError:err.message});
+    }
+  }
+  outboxBusy=false;updateOutboxUi();
+  if(sent)toast(`${sent} offerte${sent>1?"s":""} verstuurd${failed?` (${failed} nog niet in Odoo, zie lijst)`:""}`,3500);
+  if(stopped)toast(stopped,3500);
+  else if(!sent&&outbox.all().length)toast("Versturen mislukt; zie de foutmelding bij de offerte.",3500);
+  listLoaded=false;if(ROOT.dataset.view==="list")loadList();
+}
+function updateOutboxUi(){
+  const items=outbox.all(),n=items.length,on=navigator.onLine;
+  const badge=$("#gndOutboxBadge");badge.textContent=n;badge.classList.toggle("gnd-hidden",!n);
+  $("#gndOutboxBar").classList.toggle("gnd-hidden",!n||!on);
+  $("#gndOutboxBarText").textContent=outboxBusy?"Offertes uit de wachtrij worden verstuurd…":`${n} offerte${n>1?"s":""} in de wachtrij, nog niet verstuurd.`;
+  $("#gndOutboxSendAll").disabled=outboxBusy||!on;
+  const box=$("#gndOutbox");box.hidden=!n;
+  if(!n){box.innerHTML="";return}
+  box.innerHTML=`<h2>Wachtrij</h2><p class="gnd-note">Deze offertes staan alleen op dit toestel en zijn nog niet naar GlassNext/Odoo verstuurd.${on?"":" Versturen kan zodra je weer online bent."}</p>
+    <div class="gnd-outbox-list">${items.map(it=>{
+      const d=new Date(it.createdAt||Date.now());
+      return `<article class="gnd-q is-queued" data-outbox="${esc(it.cid)}">
+        <div class="gnd-q-top"><span class="gnd-q-nr">Nog niet verstuurd</span><span class="gnd-q-date">${esc(d.toLocaleDateString("nl-NL"))} ${esc(d.toLocaleTimeString("nl-NL",{hour:"2-digit",minute:"2-digit"}))}</span></div>
+        <div class="gnd-q-cust">${esc(it.customerName||"–")}</div>
+        <div class="gnd-q-meta">${[it.reference,`${it.pieces||0} stuks · ${fmtN(it.rollArea||0)} m² rol`,it.fileSkipped?"importbestand niet bewaard (te groot)":""].filter(Boolean).map(esc).join(" · ")}</div>
+        <div class="gnd-q-err">${esc(it.lastError?"Fout bij vorige poging: "+it.lastError:"")}</div>
+        <div class="gnd-q-actions">
+          <button type="button" class="gnd-btn gnd-small" data-outbox-send="${esc(it.cid)}" ${on&&!outboxBusy?"":"disabled"}>Versturen</button>
+          <button type="button" class="gnd-btn gnd-btn-light gnd-small" data-outbox-del="${esc(it.cid)}" ${outboxBusy?"disabled":""}>Verwijderen</button>
+        </div>
+      </article>`}).join("")}</div>
+    ${n>1?`<button type="button" class="gnd-btn gnd-btn-block gnd-outbox-all" data-outbox-send="" ${on&&!outboxBusy?"":"disabled"}>Alle ${n} versturen</button>`:""}`;
+}
+$("#gndOutbox").addEventListener("click",e=>{
+  const s=e.target.closest("[data-outbox-send]");
+  if(s){sendOutbox(s.dataset.outboxSend||null);return}
+  const d=e.target.closest("[data-outbox-del]");
+  if(d){
+    const it=outbox.all().find(x=>x.cid===d.dataset.outboxDel);
+    if(it&&confirm(`Offerte voor ${it.customerName||"deze klant"} uit de wachtrij verwijderen? Hij is nog niet verstuurd en gaat dan verloren.`)){outbox.remove(it.cid);updateOutboxUi()}
+  }
+});
+$("#gndOutboxSendAll").onclick=()=>sendOutbox();
 
 /* ---------------- Klant ---------------- */
 const F=["CustomerName","ContactName","Email","Phone","Address","City","Reference","Description","Notes"];
@@ -475,17 +584,24 @@ function renderSummary(){
 }
 
 /* ---------------- Versturen ---------------- */
+const submitLabel=()=>navigator.onLine?"Verstuur offerte naar GlassNext":"Bewaar in wachtrij (offline)";
+function finishSubmitUi(){
+  submitted=true;store.clear();
+  $("#gndSubmit").classList.add("gnd-hidden");$("#gndDone").classList.remove("gnd-hidden");
+  $(".gnd-actionbar").classList.add("gnd-hidden");
+  listLoaded=false;
+}
 async function submit(){
   const st=$("#gndSubmitStatus");setStatus(st,"","");
   if(submitted)return;
-  if(!navigator.onLine){setStatus(st,"warn","Geen verbinding. Je invoer is bewaard; verstuur zodra je weer online bent.");return}
   const e=validateCustomer();if(e){await setStep(1);return}
   if(!lastPlan){setStatus(st,"","Snijplan wordt eerst berekend…");if(!(await calculatePlan())){setStatus(st,"err","Het snijplan kon niet worden berekend. Controleer de ruitmaten.");return}}
   calculatePrices();
-  const btn=$("#gndSubmit");btn.disabled=true;const orig=btn.textContent;btn.textContent="Versturen…";
-  setStatus(st,"","Offerte wordt opgeslagen en naar Odoo verstuurd…");
+  const btn=$("#gndSubmit");btn.disabled=true;btn.textContent=navigator.onLine?"Versturen…":"Bewaren…";
   const c=customer();
+  const cid=newCid(),createdAt=new Date().toISOString();
   const payload={
+    clientId:cid,createdAt,
     customer:c,installMode:$("#gndInstallMode").value,mountClass:$("#gndMountClass").value,
     otherCosts:readOtherCosts(),panes:readPanes(),importFileName:importFile?.name||"",
     calc:lastCalc?{subtotal:lastCalc.subtotal,vat:lastCalc.vat,total:lastCalc.total,matGross:lastCalc.matGross,cut:lastCalc.cut,other:lastCalc.other}:{},
@@ -494,27 +610,33 @@ async function submit(){
       netW:p.item.netW,netH:p.item.netH,rotated:p.rotated,margin:p.item.margin,seamSide:p.item.seamSide||""}))}
   };
   let pdf=null;try{pdf=planPdfDataUri(c.customerName)}catch(err){console.warn("PDF mislukt",err)}
+  const entry={cid,createdAt:Date.now(),customerName:c.customerName,reference:c.reference,
+    pieces:lastPlan.placed.length,rollArea:lastPlan.stats.rollArea,payload,pdf,file:importFile||null};
   let ok=false;
+  const toQueue=async why=>{
+    if(await queueEntry(entry)){
+      ok=true;finishSubmitUi();
+      setStatus(st,"",`<div class="gnd-result warn">${esc(why)} De offerte voor <b>${esc(c.customerName)}</b> staat in de <b>wachtrij</b> op dit toestel. Verstuur hem bij <b>Offertes</b> zodra je weer online bent.</div>`,true);
+    }else{
+      setStatus(st,"err","Bewaren in de wachtrij is mislukt (geheugen van het toestel vol?). Je invoer staat nog als concept; probeer later opnieuw.");
+    }
+  };
+  if(!navigator.onLine){await toQueue("Geen verbinding.");btn.disabled=submitted;btn.textContent=submitLabel();return}
+  setStatus(st,"","Offerte wordt opgeslagen en naar Odoo verstuurd…");
   try{
-    const resp=await ajax("gnd_submit_quote",fd=>{
-      fd.append("project_json",JSON.stringify(payload));
-      if(importFile)fd.append("import_file",importFile,importFile.name);
-      if(pdf)fd.append("plan_pdf",pdf);
-    });
-    if(!resp.success)throw Error(resp.data?.message||"Onbekende fout.");
-    ok=true;submitted=true;store.clear();
-    const d=resp.data,o=d.odoo||{};
+    const d=await sendEntry(entry);
+    ok=true;finishSubmitUi();
+    const o=d.odoo||{};
     if(o.success){
       setStatus(st,"",`<div class="gnd-result ok">Offerte <b>${esc(d.offerNumber)}</b> is aangemaakt${o.orderName?` in Odoo als <b>${esc(o.orderName)}</b>`:""}.`+(o.url?` <a href="${esc(o.url)}" target="_blank" rel="noopener">Openen in Odoo</a>`:"")+`</div>`,true);
     }else{
       setStatus(st,"",`<div class="gnd-result warn">Offerte <b>${esc(d.offerNumber)}</b> is opgeslagen, maar het doorzetten naar Odoo is mislukt: ${esc(o.error||"onbekende fout")}. Je kunt het opnieuw proberen bij <b>Offertes</b>.</div>`,true);
     }
-    btn.classList.add("gnd-hidden");$("#gndDone").classList.remove("gnd-hidden");
-    $(".gnd-actionbar").classList.add("gnd-hidden");
-    listLoaded=false;
   }catch(err){
-    if(!sessionExpired(err))setStatus(st,"err",`Versturen mislukt: ${err.message}`);
-  }finally{if(!ok){btn.disabled=!navigator.onLine;btn.textContent=orig}}
+    if(sessionExpired(err)){/* concept bewaard, opnieuw inloggen */}
+    else if(isNetErr(err))await toQueue("De verbinding viel weg tijdens het versturen.");
+    else setStatus(st,"err",`Versturen mislukt: ${err.message}`);
+  }finally{if(!ok){btn.disabled=false;btn.textContent=submitLabel()}}
 }
 $("#gndSubmit").onclick=submit;
 
@@ -524,7 +646,7 @@ function resetForm(){
   paneBody.innerHTML="";importFile=null;submitted=false;
   $("#gndOtherCosts").innerHTML="";initCosts();
   ["#gndImportStatus","#gndSubmitStatus","#gndQuickStatus"].forEach(s=>setStatus($(s),"",""));
-  $("#gndSubmit").classList.remove("gnd-hidden");$("#gndSubmit").disabled=!navigator.onLine;$("#gndDone").classList.add("gnd-hidden");
+  $("#gndSubmit").classList.remove("gnd-hidden");$("#gndSubmit").disabled=false;$("#gndSubmit").textContent=submitLabel();$("#gndDone").classList.add("gnd-hidden");
   $(".gnd-actionbar").classList.remove("gnd-hidden");
   Q.id.value="";Q.w.value="";Q.h.value="";Q.n.value="1";Q.room.value="";Q.rot.value=SET.rotateDefault;
   invalidate();calculatePrices();store.clear();setStep(1);
@@ -589,7 +711,7 @@ async function loadList(){
         <div class="gnd-q-meta">${[r.reference,isAdmin?r.dealer:"",`${r.pieces} stuks · ${fmtN(r.rollArea)} m² rol`].filter(Boolean).map(esc).join(" · ")}</div>
         <div class="gnd-q-odoo">${odoo}</div>
       </article>`}).join("");
-  }catch(err){if(!sessionExpired(err))box.innerHTML=`<div class="gnd-empty gnd-err">${esc(err.message)}</div>`}
+  }catch(err){if(!sessionExpired(err))box.innerHTML=`<div class="gnd-empty${isNetErr(err)?"":" gnd-err"}">${esc(isNetErr(err)?"Geen verbinding: verstuurde offertes zijn offline niet te zien.":err.message)}</div>`}
 }
 $("#gndList").addEventListener("click",async e=>{
   const b=e.target.closest("[data-retry]");if(!b)return;
@@ -625,9 +747,14 @@ window.addEventListener("popstate",()=>{if(CFG.mode==="app")setView(viewFromHash
 function updateOnline(){
   const on=navigator.onLine;
   $("#gndOffline").classList.toggle("gnd-hidden",on);
-  if(!submitted&&!busy)$("#gndSubmit").disabled=!on;
+  if(!submitted&&!busy){$("#gndSubmit").disabled=false;$("#gndSubmit").textContent=submitLabel()}
+  updateOutboxUi();
 }
-window.addEventListener("online",()=>{updateOnline();toast("Weer online")});
+window.addEventListener("online",()=>{
+  updateOnline();
+  const n=outbox.all().length;
+  toast(n?`Weer online · ${n} offerte${n>1?"s":""} in de wachtrij. Tik op "Nu versturen".`:"Weer online",n?4500:2200);
+});
 window.addEventListener("offline",updateOnline);
 
 /* ---------------- Installeren / service worker ---------------- */
@@ -650,6 +777,10 @@ if(CFG.swUrl&&"serviceWorker" in navigator){
 $("#gndLogout").addEventListener("click",async e=>{
   // Gecachte app-pagina van deze gebruiker opruimen; het concept blijft per gebruiker bewaard.
   e.preventDefault();const href=e.currentTarget.href;
+  const n=outbox.all().length;
+  if(n&&!confirm(`Er staa${n>1?"n":"t"} nog ${n} offerte${n>1?"s":""} in de wachtrij die niet verstuurd ${n>1?"zijn":"is"}. Ze blijven op dit toestel bewaard tot je weer inlogt.
+
+Toch uitloggen?`))return;
   try{if(window.caches){const ks=await caches.keys();await Promise.all(ks.filter(k=>k.startsWith("gnd-")).map(k=>caches.delete(k)))}}catch(err){}
   location.href=href;
 });
@@ -664,5 +795,5 @@ step=restoredStep||1;ROOT.dataset.step=String(step);
 setStep(step,{scroll:false});
 if(CFG.mode==="app"){const v=viewFromHash();if(v!=="new")setView(v,{push:false})}
 // Exporteer een paar functies voor de testharnas (niet nodig in productie).
-window.GND_APP={setStep,setView,calculatePlan,readPanes,importPaneFile,draftState,get step(){return step},get lastPlan(){return lastPlan}};
+window.GND_APP={outbox,sendOutbox,updateOutboxUi,submit,setStep,setView,calculatePlan,readPanes,importPaneFile,draftState,get step(){return step},get lastPlan(){return lastPlan}};
 })();

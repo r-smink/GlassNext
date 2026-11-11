@@ -268,3 +268,24 @@
   .gnd-panes-wrap{max-height:520px}
   .gnd-calc-card .gnd-card-body{display:block}
 }
+
+/* ---------- Wachtrij (offline gemaakte offertes) ---------- */
+.gnd-tab{position:relative}
+.gnd-tab-badge{position:absolute;top:2px;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--danger);color:#fff;font-size:11px;font-weight:800;line-height:18px;text-align:center;box-shadow:0 0 0 2px var(--navy)}
+.gnd-mode-app .gnd-tab-badge{box-shadow:0 0 0 2px #fff}
+.gnd-outbar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#e8f3fb;color:#0b4a73;padding:8px 14px;font-size:13px;font-weight:600;border-bottom:1px solid #c7e1f3}
+.gnd-outbar .gnd-btn{margin:0;flex:none}
+.gnd-mode-app .gnd-outbar{position:sticky;top:calc(60px + var(--safe-t));z-index:24}
+.gnd-outbox{margin-bottom:6px}
+.gnd-outbox h2{margin:0 0 4px}
+.gnd-outbox .gnd-note{margin:0 0 10px}
+.gnd-outbox-list{display:grid;gap:10px}
+.gnd-q.is-queued{border-color:#c7e1f3;background:#f7fbfe}
+.gnd-q-err{margin-top:6px;font-size:12px;color:var(--danger)}
+.gnd-q-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.gnd-q-actions .gnd-btn{margin:0}
+.gnd-outbox-all{margin-top:10px}
+@media (min-width:900px){
+  .gnd-mode-app .gnd-outbar{top:calc(62px + var(--safe-t))}
+  .gnd-tab-badge{position:static;margin-left:2px;box-shadow:none}
+}
