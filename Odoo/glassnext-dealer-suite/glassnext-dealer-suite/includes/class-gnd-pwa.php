@@ -117,6 +117,28 @@ class GND_PWA {
         ];
     }
 
+    /** Schermafbeeldingen voor het installatievenster (Android) en PWABuilder/de store. */
+    public static function screenshots() {
+        $base = GND_PLUGIN_URL . 'assets/screenshots/';
+        $v = '?ver=' . GND_VERSION;
+        $shots = [
+            'screen-1-klant.jpg' => 'Klant en project invullen',
+            'screen-2-maten.jpg' => 'Ruitmaten snel invoeren op locatie',
+            'screen-3-start.jpg' => 'GlassNext Dealer opstartscherm',
+        ];
+        $out = [];
+        foreach ($shots as $file => $label) {
+            $out[] = [
+                'src'         => $base . $file . $v,
+                'sizes'       => '720x1511',
+                'type'        => 'image/jpeg',
+                'form_factor' => 'narrow',
+                'label'       => $label,
+            ];
+        }
+        return $out;
+    }
+
     private function manifest() {
         $path = GlassNext_Dealer_Suite::app_path();
         $manifest = [
@@ -125,14 +147,30 @@ class GND_PWA {
             'short_name'       => 'GN Dealer',
             'description'      => 'Ruitmaten invoeren, snijplan berekenen en offertes naar GlassNext sturen.',
             'lang'             => 'nl-NL',
+            'dir'              => 'ltr',
             'start_url'        => $path . '?source=pwa',
             'scope'            => $path,
             'display'          => 'standalone',
+            'display_override' => ['standalone', 'minimal-ui'],
             'orientation'      => 'any',
             'background_color' => '#0b1e2d',
             'theme_color'      => '#0b1e2d',
             'icons'            => self::icons()['list'],
+            'screenshots'      => self::screenshots(),
+            // Webapp blijft de voorkeur: ook dealers zonder Play Store (of op iOS) installeren via de browser.
+            'prefer_related_applications' => false,
+            'related_applications'        => [],
         ];
+        $package = GlassNext_Dealer_Suite::opt('gnd_android_package');
+        if ($package) {
+            $manifest['related_applications'][] = [
+                'platform' => 'play',
+                'id'       => $package,
+                'url'      => 'https://play.google.com/store/apps/details?id=' . rawurlencode($package),
+            ];
+        }
+        $iarc = trim((string) GlassNext_Dealer_Suite::opt('gnd_iarc_rating_id'));
+        if ($iarc !== '') $manifest['iarc_rating_id'] = $iarc;
         nocache_headers();
         header('Content-Type: application/manifest+json; charset=utf-8');
         echo wp_json_encode($manifest, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
@@ -160,7 +198,11 @@ const SHELL={$js_shell};
 const OFFLINE='<!doctype html><html lang="nl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title><body style="font-family:system-ui,sans-serif;background:#0b1e2d;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0;padding:24px;text-align:center"><div><h1 style="font-size:20px">Geen verbinding</h1><p>Open de app opnieuw zodra je weer online bent.</p></div></body></html>';
 
 self.addEventListener('install',e=>{
-  e.waitUntil(caches.open(CACHE).then(c=>Promise.all(ASSETS.map(u=>c.add(u).catch(()=>null)))).then(()=>self.skipWaiting()));
+  // Precache: app-bestanden + de app-shell zelf, zodat de app direct na de eerste installatie offline opent.
+  e.waitUntil(caches.open(CACHE).then(c=>Promise.all([
+    ...ASSETS.map(u=>c.add(u).catch(()=>null)),
+    fetch(SHELL,{credentials:'include',cache:'reload'}).then(r=>{if(r.ok&&!r.redirected)return c.put(SHELL,r)}).catch(()=>null)
+  ])).then(()=>self.skipWaiting()));
 });
 self.addEventListener('activate',e=>{
   e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('gnd-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
@@ -178,11 +220,11 @@ self.addEventListener('fetch',e=>{
     e.respondWith(fetch(req).then(resp=>{
       if(resp.ok&&resp.type==='basic'&&url.origin===location.origin){const copy=resp.clone();caches.open(CACHE).then(c=>c.put(SHELL,copy))}
       return resp;
-    }).catch(()=>caches.match(SHELL).then(m=>m||new Response(OFFLINE,{headers:{'Content-Type':'text/html; charset=utf-8'}}))));
+    }).catch(()=>caches.match(SHELL).then(m=>m||caches.match(req,{ignoreSearch:true})).then(m=>m||new Response(OFFLINE,{headers:{'Content-Type':'text/html; charset=utf-8'}}))));
     return;
   }
   if(ASSETS.includes(url.href)){
-    e.respondWith(caches.match(req).then(m=>m||fetch(req).then(resp=>{if(resp.ok){const copy=resp.clone();caches.open(CACHE).then(c=>c.put(req,copy))}return resp})));
+    e.respondWith(caches.match(req,{ignoreVary:true}).then(m=>m||fetch(req).then(resp=>{if(resp.ok){const copy=resp.clone();caches.open(CACHE).then(c=>c.put(req,copy))}return resp})));
   }
 });
 JS;

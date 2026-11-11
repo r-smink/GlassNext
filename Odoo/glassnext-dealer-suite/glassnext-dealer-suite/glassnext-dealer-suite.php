@@ -2,7 +2,7 @@
 /**
  * Plugin Name: GlassNext Dealer Suite
  * Description: Afgeschermde mobiele webapp (PWA) voor dealers en beheerders: ruitmaten invoeren of importeren (CSV/XLSX), snijplan berekenen en direct als offerte naar Odoo sturen. Gebruikt de instellingen en Odoo-koppeling van de GlassNext Suite. App: /dealers/ — shortcode: [glassnext_dealer_suite]
- * Version: 1.1.2
+ * Version: 1.1.5
  * Author: GlassNext
  * Requires Plugins: glassnext-suite
  * Text Domain: glassnext-dealer-suite
@@ -10,7 +10,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('GND_VERSION', '1.1.2');
+define('GND_VERSION', '1.1.5');
 define('GND_PLUGIN_FILE', __FILE__);
 define('GND_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('GND_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -110,6 +110,7 @@ class GlassNext_Dealer_Suite {
             'gnd_app_icon'               => '',
             'gnd_android_package'        => '',
             'gnd_android_fingerprint'    => '',
+            'gnd_iarc_rating_id'         => '',
         ];
     }
 
@@ -145,6 +146,7 @@ class GlassNext_Dealer_Suite {
             'gnd_app_icon'            => function ($v) { $v = absint($v); return $v ? (string) $v : ''; },
             'gnd_android_package'     => function ($v) { return preg_replace('/[^A-Za-z0-9._]/', '', (string) $v); },
             'gnd_android_fingerprint' => function ($v) { return strtoupper(preg_replace('/[^A-Fa-f0-9:,\s]/', '', (string) $v)); },
+            'gnd_iarc_rating_id'      => function ($v) { return preg_replace('/[^A-Za-z0-9-]/', '', (string) $v); },
         ];
         foreach (array_keys(self::defaults()) as $key) {
             register_setting('gnd_settings_group', $key, ['sanitize_callback' => $callbacks[$key] ?? 'sanitize_text_field']);
@@ -212,6 +214,10 @@ class GlassNext_Dealer_Suite {
                         <input type="text" id="gnd_android_package" name="gnd_android_package" value="<?php echo esc_attr(self::opt('gnd_android_package')); ?>" class="regular-text" placeholder="nl.glassnext.dealer"><br>
                         <input type="text" id="gnd_android_fingerprint" name="gnd_android_fingerprint" value="<?php echo esc_attr(self::opt('gnd_android_fingerprint')); ?>" class="large-text" placeholder="SHA-256 fingerprint(s) van de signing key, komma-gescheiden" style="margin-top:6px">
                         <p class="description">Alleen nodig voor een Play Store-versie (Trusted Web Activity). Ingevuld = <code><?php echo esc_html(home_url('/.well-known/assetlinks.json')); ?></code> wordt geserveerd.</p>
+                    </td></tr>
+                    <tr><th><label for="gnd_iarc_rating_id">IARC-ratingcode</label></th><td>
+                        <input type="text" id="gnd_iarc_rating_id" name="gnd_iarc_rating_id" value="<?php echo esc_attr(self::opt('gnd_iarc_rating_id')); ?>" class="regular-text" placeholder="bijv. e84b072d-71b3-4d3e-86ae-31a8ce4e53b7">
+                        <p class="description">Optioneel. Krijg je per e-mail van IARC na de contentrating-vragenlijst in de Play Console. Wordt als <code>iarc_rating_id</code> in het manifest gezet.</p>
                     </td></tr>
                 </table>
                 <?php submit_button('Instellingen opslaan'); ?>
