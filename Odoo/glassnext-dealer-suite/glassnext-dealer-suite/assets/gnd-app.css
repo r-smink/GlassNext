@@ -56,7 +56,7 @@
 .gnd-count{display:inline-grid;place-items:center;min-width:24px;height:22px;padding:0 7px;border-radius:999px;background:#e5edf3;color:var(--navy);font-size:12px;font-weight:800}
 
 /* ---------- Stappen ---------- */
-.gnd-steps{list-style:none;margin:0 0 12px;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.gnd-steps{list-style:none;margin:0 0 12px;padding:0;display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
 .gnd-steps li{margin:0;padding:0}
 .gnd-steps button{width:100%;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:0;padding:4px 2px;cursor:pointer;color:var(--muted);font-size:12px;font-weight:600}
 .gnd-steps b{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#dfe8ef;color:var(--navy);font-size:13px}
@@ -65,7 +65,7 @@
 .gnd-steps button.is-active b{background:var(--blue);color:#fff;box-shadow:0 0 0 4px rgba(77,182,232,.25)}
 .gnd-step-pane{display:none}
 #gnd-app[data-step="1"] [data-step-pane="1"],#gnd-app[data-step="2"] [data-step-pane="2"],
-#gnd-app[data-step="3"] [data-step-pane="3"],#gnd-app[data-step="4"] [data-step-pane="4"]{display:block}
+#gnd-app[data-step="3"] [data-step-pane="3"],#gnd-app[data-step="4"] [data-step-pane="4"],#gnd-app[data-step="5"] [data-step-pane="5"]{display:block}
 
 /* ---------- Velden ---------- */
 .gnd-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -179,7 +179,7 @@
 .gnd-mode-shortcode .gnd-actionbar{bottom:0;padding-bottom:10px}
 .gnd-actionbar .gnd-reset{align-self:center}
 #gnd-app[data-step="1"] #gndPrev{visibility:hidden}
-#gnd-app[data-step="4"] #gndNext{visibility:hidden}
+#gnd-app[data-step="5"] #gndNext{visibility:hidden}
 
 /* ---------- Offertelijst ---------- */
 .gnd-list{display:grid;gap:10px;margin-top:10px}
@@ -248,7 +248,7 @@
   .gnd-view{max-width:1100px;margin:0 auto}
   .gnd-fields{grid-template-columns:repeat(4,1fr)}
   .gnd-f-wide{grid-column:span 2}
-  .gnd-steps{grid-template-columns:repeat(4,auto);justify-content:start;gap:18px}
+  .gnd-steps{grid-template-columns:repeat(5,auto);justify-content:start;gap:18px}
   .gnd-steps button{flex-direction:row;font-size:14px;gap:8px}
   .gnd-list{grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
   .gnd-actionbar{grid-template-columns:auto 1fr auto;padding-bottom:12px}
@@ -289,3 +289,30 @@
   .gnd-mode-app .gnd-outbar{top:calc(62px + var(--safe-t))}
   .gnd-tab-badge{position:static;margin-left:2px;box-shadow:none}
 }
+
+/* ---------- Foto per ruit ---------- */
+.gnd-q-photo{grid-column:span 6}
+.gnd-photo-btn{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:6px 10px;border:1px dashed #9cc3dc;border-radius:10px;background:#f4f9fc;color:var(--navy);font:inherit;font-size:14px;font-weight:600;cursor:pointer;text-align:left}
+.gnd-photo-btn.has-photo{border-style:solid;background:#eef7f2;border-color:#9fd4bd}
+.gnd-photo-ico{flex:none;width:36px;height:36px;border-radius:8px;background:#dcebf5 center/cover no-repeat;position:relative}
+.gnd-photo-ico:not(.has-img)::before{content:"";position:absolute;inset:9px 7px 8px;border:2px solid var(--navy);border-radius:4px}
+.gnd-photo-ico:not(.has-img)::after{content:"";position:absolute;width:8px;height:8px;border:2px solid var(--navy);border-radius:50%;left:12px;top:13px}
+#gndPaneTable td.c-room{grid-column:span 4}
+#gndPaneTable td.c-photo{grid-column:span 2}
+#gndPaneTable .gnd-photo-btn{min-height:42px;padding:3px 6px;gap:6px;font-size:12px}
+#gndPaneTable .gnd-photo-ico{width:32px;height:32px}
+#gndPaneTable .gnd-photo-btn .gnd-photo-txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gnd-roi-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.gnd-roi-glass{grid-column:span 2}
+@media(min-width:600px){
+  .gnd-q-photo{grid-column:span 6}
+  #gndPaneTable td.c-room{grid-column:span 4}
+  .gnd-roi-fields{grid-template-columns:2fr 1fr 1fr}
+  .gnd-roi-glass{grid-column:auto}
+}
+@media(min-width:900px){
+  #gndPaneTable td.c-photo{width:120px}
+  .gnd-steps{gap:14px}
+}
+@media(max-width:380px){.gnd-steps button{font-size:11px}}
+.gnd-link{background:none;border:0;padding:4px 0 0;color:var(--danger);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;display:block}

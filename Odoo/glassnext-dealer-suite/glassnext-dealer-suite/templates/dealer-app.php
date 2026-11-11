@@ -31,7 +31,8 @@ $gnd_admin = current_user_can('manage_options');
         <li><button type="button" data-goto="1" class="is-active"><b>1</b><span>Klant</span></button></li>
         <li><button type="button" data-goto="2"><b>2</b><span>Maten</span></button></li>
         <li><button type="button" data-goto="3"><b>3</b><span>Snijplan</span></button></li>
-        <li><button type="button" data-goto="4"><b>4</b><span>Versturen</span></button></li>
+        <li><button type="button" data-goto="4"><b>4</b><span>ROI</span></button></li>
+        <li><button type="button" data-goto="5"><b>5</b><span>Versturen</span></button></li>
       </ol>
 
       <!-- Stap 1: klant -->
@@ -68,6 +69,9 @@ $gnd_admin = current_user_can('manage_options');
               <div class="gnd-stepper"><button type="button" data-q-step="-1" aria-label="Minder">−</button><input id="gndQN" inputmode="numeric" value="1"><button type="button" data-q-step="1" aria-label="Meer">+</button></div></div>
             <div class="gnd-q-rot"><label for="gndQRot">Rotatie</label><select id="gndQRot"><option value="1">Ja</option><option value="0">Nee</option></select></div>
             <div class="gnd-q-room"><label for="gndQRoom">Ruimte / verdieping</label><input id="gndQRoom" list="gndRoomList" enterkeyhint="done"><datalist id="gndRoomList"></datalist></div>
+            <div class="gnd-q-photo"><label>Foto <small>(optioneel)</small></label>
+              <input type="file" id="gndQPhotoFile" accept="image/*" hidden>
+              <button type="button" class="gnd-photo-btn" id="gndQPhoto" aria-label="Foto toevoegen aan deze ruit"><span class="gnd-photo-ico" aria-hidden="true"></span><span class="gnd-photo-txt">Foto maken of kiezen</span></button></div>
             <div class="gnd-q-btn"><button type="submit" class="gnd-btn gnd-btn-block">+ Toevoegen &amp; volgende</button></div>
           </form>
           <div id="gndQuickStatus" class="gnd-status" aria-live="polite"></div>
@@ -82,7 +86,7 @@ $gnd_admin = current_user_can('manage_options');
           <div class="gnd-empty" id="gndPaneEmpty">Nog geen ruiten. Voeg ze hierboven toe of importeer een Excel/CSV-bestand.</div>
           <div class="gnd-table-wrap gnd-panes-wrap">
             <table class="gnd-table" id="gndPaneTable">
-              <thead><tr><th>Kenmerk</th><th>Breedte cm</th><th>Hoogte cm</th><th>Aantal</th><th>Rotatie</th><th>Ruimte / verdieping</th><th></th></tr></thead>
+              <thead><tr><th>Kenmerk</th><th>Breedte cm</th><th>Hoogte cm</th><th>Aantal</th><th>Rotatie</th><th>Ruimte / verdieping</th><th>Foto</th><th></th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -130,12 +134,31 @@ $gnd_admin = current_user_can('manage_options');
         </div></div>
       </div>
 
-      <!-- Stap 4: versturen -->
+      <!-- Stap 4: ROI -->
       <div class="gnd-step-pane" data-step-pane="4">
+        <div class="gnd-card"><div class="gnd-card-body">
+          <h2>ROI-berekening</h2>
+          <div class="gnd-roi-fields">
+            <div class="gnd-roi-glass"><label for="gndRoiGlass">Te verbeteren glastype</label><select id="gndRoiGlass"></select></div>
+            <div><label for="gndRoiGas">Gasprijs <small>&euro;/m&sup3;</small></label><input id="gndRoiGas" inputmode="decimal"></div>
+            <div><label for="gndRoiElec">Elektriciteitsprijs <small>&euro;/kWh</small></label><input id="gndRoiElec" inputmode="decimal"></div>
+          </div>
+          <div id="gndRoiStatus" class="gnd-status"></div>
+          <div id="gndRoiMetrics" class="gnd-metrics"></div>
+          <details class="gnd-details"><summary>Berekening per onderdeel</summary>
+            <div class="gnd-table-wrap"><table class="gnd-table gnd-money"><thead><tr><th>Onderdeel</th><th>Per m&sup2;/jaar</th><th>Project/jaar</th><th>Waarde/jaar</th></tr></thead><tbody id="gndRoiRows"></tbody></table></div>
+          </details>
+          <div class="gnd-toolbar"><button type="button" class="gnd-btn gnd-btn-light gnd-small" id="gndRoiPdf">ROI-PDF bekijken</button></div>
+          <p class="gnd-note">De ROI-PDF wordt bij het versturen automatisch als bijlage aan de Odoo-offerte toegevoegd. Indicatieve scenarioanalyse; werkelijke besparingen hangen af van glasopbouw, gebouw, installaties en gebruik.</p>
+        </div></div>
+      </div>
+
+      <!-- Stap 5: versturen -->
+      <div class="gnd-step-pane" data-step-pane="5">
         <div class="gnd-card"><div class="gnd-card-body">
           <h2>Controleren en versturen</h2>
           <div id="gndSummary" class="gnd-summary"></div>
-          <p class="gnd-note">Er wordt een verkoopofferte (concept) in Odoo aangemaakt met de orderregels, de ruitmaten in de chatter en als bijlagen het snijplan (PDF), de snijplan-CSV en een eventueel importbestand.</p>
+          <p class="gnd-note">Er wordt een verkoopofferte (concept) in Odoo aangemaakt met de orderregels, de ruitmaten in de chatter en als bijlagen het snijplan (PDF), de ROI-PDF, de snijplan-CSV, de foto's per ruit en een eventueel importbestand.</p>
           <button type="button" class="gnd-btn gnd-btn-big gnd-btn-block" id="gndSubmit">Verstuur offerte naar GlassNext</button>
           <div id="gndSubmitStatus" class="gnd-status" aria-live="polite"></div>
           <div id="gndDone" class="gnd-done gnd-hidden">

@@ -25,7 +25,7 @@ const SET={
 };
 const CLASS_TEXT={easy:"Eenvoudig",average:"Gemiddeld",complex:"Complex",very:"Zeer complex"};
 
-let lastPlan=null,lastCalc=null,importFile=null,busy=false,submitted=false;
+let lastPlan=null,lastCalc=null,lastROI=null,importFile=null,busy=false,submitted=false;
 
 /* ---------------- Kleine helpers ---------------- */
 let toastTimer=null;
@@ -35,13 +35,80 @@ const store={
   key:"gnd_draft_"+(CFG.user?.id||0),
   get(){try{return JSON.parse(localStorage.getItem(this.key)||"null")}catch(e){return null}},
   set(v){try{localStorage.setItem(this.key,JSON.stringify(v))}catch(e){}},
-  clear(){try{localStorage.removeItem(this.key)}catch(e){}}
+  clear(){try{localStorage.removeItem(this.key)}catch(e){}idb.delPrefix(DRAFT_PHOTO_PREFIX)}
 };
+
+/* ---------------- Foto-opslag op het toestel (IndexedDB; blobs passen niet in localStorage) ---------------- */
+const idb={
+  _db:null,
+  open(){
+    if(!this._db)this._db=new Promise((res,rej)=>{
+      if(!window.indexedDB)return rej(Error("IndexedDB niet beschikbaar"));
+      const r=indexedDB.open("gnd-photos",1);
+      r.onupgradeneeded=()=>r.result.createObjectStore("p");
+      r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);
+    });
+    return this._db;
+  },
+  async run(mode,fn){
+    const db=await this.open();
+    return new Promise((res,rej)=>{const t=db.transaction("p",mode),req=fn(t.objectStore("p"));t.oncomplete=()=>res(req?req.result:undefined);t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error)});
+  },
+  get(k){return this.run("readonly",st=>st.get(k)).catch(()=>null)},
+  set(k,v){return this.run("readwrite",st=>st.put(v,k)).then(()=>true).catch(()=>false)},
+  del(k){return this.run("readwrite",st=>st.delete(k)).catch(()=>null)},
+  delPrefix(pre){return this.run("readwrite",st=>st.delete(IDBKeyRange.bound(pre,pre+"\uffff"))).catch(()=>null)}
+};
+const DRAFT_PHOTO_PREFIX="d|"+(CFG.user?.id||0)+"|";
+const photos=new Map(); // rij-uid -> Blob (JPEG)
+const rowUid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+function compressImage(file,maxDim=1600,quality=.82){
+  return new Promise((resolve,reject)=>{
+    const url=URL.createObjectURL(file),img=new Image();
+    img.onload=()=>{
+      let w=img.naturalWidth,h=img.naturalHeight;
+      if(w>maxDim||h>maxDim){if(w>h){h=Math.round(h*maxDim/w);w=maxDim}else{w=Math.round(w*maxDim/h);h=maxDim}}
+      const c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      c.toBlob(b=>b?resolve(b):reject(Error("Foto kon niet worden verwerkt.")),"image/jpeg",quality);
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);reject(Error("Dit bestand is geen leesbare foto."))};
+    img.src=url;
+  });
+}
+function paintPhotoBtn(btn,blob){
+  const ico=btn.querySelector(".gnd-photo-ico"),txt=btn.querySelector(".gnd-photo-txt");
+  if(ico._url){URL.revokeObjectURL(ico._url);ico._url=null}
+  if(blob){ico._url=URL.createObjectURL(blob);ico.style.backgroundImage=`url("${ico._url}")`;ico.classList.add("has-img")}
+  else{ico.style.backgroundImage="";ico.classList.remove("has-img")}
+  btn.classList.toggle("has-photo",!!blob);
+  if(txt)txt.textContent=blob?(btn.dataset.doneText||"Foto wijzigen"):(btn.dataset.emptyText||"Foto");
+}
+function setRowPhoto(tr,blob){
+  const uid=tr.dataset.uid;
+  if(blob){photos.set(uid,blob);idb.set(DRAFT_PHOTO_PREFIX+uid,blob)}
+  else{photos.delete(uid);idb.del(DRAFT_PHOTO_PREFIX+uid)}
+  paintPhotoBtn(tr.querySelector(".gnd-photo-btn"),blob);
+  tr.querySelector(".pdelphoto").hidden=!blob;
+}
+const safeName=s=>String(s||"").trim().replace(/[^A-Za-z0-9._-]+/g,"_").replace(/^[._-]+|[._-]+$/g,"").slice(0,60);
+/** Foto's in rijvolgorde met de naam van het kenmerk (R1.jpg); dubbele kenmerken krijgen _2, _3. */
+function collectPhotos(){
+  const used=new Set(),out=[];
+  [...paneBody.querySelectorAll("tr")].forEach((tr,i)=>{
+    const blob=photos.get(tr.dataset.uid);if(!blob)return;
+    const base=safeName(tr.querySelector(".pid").value)||safeName(tr.querySelector(".pid").placeholder)||`regel_${i+1}`;
+    let name=base+".jpg",k=2;while(used.has(name.toLowerCase()))name=`${base}_${k++}.jpg`;
+    used.add(name.toLowerCase());out.push({name,blob});
+  });
+  return out;
+}
 
 /* ---------------- Ruitmaten ---------------- */
 const paneBody=$("#gndPaneTable tbody");
 function addPaneRow(p={},opts={}){
   const tr=document.createElement("tr");
+  tr.dataset.uid=p.uid||rowUid();
   const rot=String(p.rot??SET.rotateDefault);
   tr.innerHTML=`<td class="c-id"><span class="gnd-cl">Kenmerk</span><input class="pid" value="${esc(p.id??"")}" placeholder="R${paneBody.children.length+1}" aria-label="Kenmerk"></td>
     <td class="c-w"><span class="gnd-cl">Breedte cm</span><input class="pw" inputmode="decimal" value="${esc(p.w??"")}" aria-label="Breedte cm"></td>
@@ -49,19 +116,30 @@ function addPaneRow(p={},opts={}){
     <td class="c-n"><span class="gnd-cl">Aantal</span><input class="pn" inputmode="numeric" value="${esc(p.n??1)}" aria-label="Aantal"></td>
     <td class="c-rot"><span class="gnd-cl">Rotatie</span><select class="prot" aria-label="Rotatie"><option value="1"${rot==="1"?" selected":""}>Ja</option><option value="0"${rot==="0"?" selected":""}>Nee</option></select></td>
     <td class="c-room"><span class="gnd-cl">Ruimte / verdieping</span><input class="proom" list="gndRoomList" value="${esc(p.room??"")}" aria-label="Ruimte / verdieping"></td>
+    <td class="c-photo"><span class="gnd-cl">Foto</span><input type="file" class="pphoto" accept="image/*" hidden>
+      <button type="button" class="gnd-photo-btn" data-empty-text="Foto" data-done-text="Wijzig" aria-label="Foto bij deze ruit"><span class="gnd-photo-ico" aria-hidden="true"></span><span class="gnd-photo-txt">Foto</span></button>
+      <button type="button" class="gnd-link pdelphoto" hidden>Foto verwijderen</button></td>
     <td class="c-del"><button type="button" class="gnd-btn gnd-btn-danger gnd-x remove" aria-label="Verwijder ruit">✕</button></td>`;
   tr.querySelector(".remove").onclick=()=>{
     const id=tr.querySelector(".pid").value||"ruit";
     if((tr.querySelector(".pw").value||tr.querySelector(".ph").value)&&!confirm(`${id} verwijderen?`))return;
-    tr.remove();invalidate();saveDraft();
+    setRowPhoto(tr,null);tr.remove();invalidate();saveDraft();
   };
+  const fin=tr.querySelector(".pphoto");
+  tr.querySelector(".gnd-photo-btn").onclick=()=>fin.click();
+  fin.onchange=async()=>{
+    const f=fin.files[0];fin.value="";if(!f)return;
+    try{setRowPhoto(tr,await compressImage(f));saveDraft()}catch(err){toast(err.message,3000)}
+  };
+  tr.querySelector(".pdelphoto").onclick=()=>{setRowPhoto(tr,null);saveDraft()};
+  if(opts.photo)setRowPhoto(tr,opts.photo);
   paneBody.appendChild(tr);
   if(opts.flash){tr.classList.add("gnd-new");setTimeout(()=>tr.classList.remove("gnd-new"),1300)}
   return tr;
 }
 function readPanes(){
   return [...paneBody.querySelectorAll("tr")].map(tr=>({
-    id:tr.querySelector(".pid").value.trim(),w:tr.querySelector(".pw").value.trim(),h:tr.querySelector(".ph").value.trim(),
+    uid:tr.dataset.uid,id:tr.querySelector(".pid").value.trim(),w:tr.querySelector(".pw").value.trim(),h:tr.querySelector(".ph").value.trim(),
     n:tr.querySelector(".pn").value.trim(),rot:tr.querySelector(".prot").value,room:tr.querySelector(".proom").value.trim()
   })).filter(p=>p.id||p.w||p.h||p.room);
 }
@@ -84,17 +162,24 @@ function nextId(){
   return "R"+Math.max(max+1,readPanes().length+1);
 }
 function invalidate(){
-  lastPlan=null;lastCalc=null;
+  lastPlan=null;lastCalc=null;lastROI=null;
   $("#gndPlanArea").classList.add("gnd-hidden");$("#gndCalcCard").classList.add("gnd-hidden");
   $("#gndPlanMetrics").innerHTML="";$("#gndProgress").style.width="0%";
   setStatus($("#gndPlanStatus"),"","Het snijplan wordt berekend zodra je deze stap opent.");
   updatePaneSummary();
 }
-paneBody.addEventListener("input",invalidate);paneBody.addEventListener("change",invalidate);
+paneBody.addEventListener("input",e=>{if(!e.target.classList.contains("pphoto"))invalidate()});paneBody.addEventListener("change",e=>{if(!e.target.classList.contains("pphoto"))invalidate()});
 $("#gndAddPane").onclick=()=>{const tr=addPaneRow({},{flash:true});updatePaneSummary();tr.querySelector(".pw").focus()};
 
 /* ---------------- Snelinvoer ---------------- */
 const Q={id:$("#gndQId"),w:$("#gndQW"),h:$("#gndQH"),n:$("#gndQN"),rot:$("#gndQRot"),room:$("#gndQRoom")};
+let quickPhoto=null;
+const qPhotoBtn=$("#gndQPhoto");qPhotoBtn.dataset.emptyText="Foto maken of kiezen";qPhotoBtn.dataset.doneText="Foto klaar · tik om te wijzigen";
+qPhotoBtn.onclick=()=>$("#gndQPhotoFile").click();
+$("#gndQPhotoFile").onchange=async e=>{
+  const f=e.target.files[0];e.target.value="";if(!f)return;
+  try{quickPhoto=await compressImage(f);paintPhotoBtn(qPhotoBtn,quickPhoto)}catch(err){toast(err.message,3000)}
+};
 Q.rot.value=SET.rotateDefault;
 ROOT.querySelectorAll("[data-q-step]").forEach(b=>b.onclick=()=>{Q.n.value=Math.max(1,(parseInt(Q.n.value,10)||1)+Number(b.dataset.qStep))});
 Q.w.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();Q.h.focus()}});
@@ -108,7 +193,8 @@ $("#gndQuick").addEventListener("submit",e=>{
   if(!(n>=1)){Q.n.classList.add("gnd-invalid");Q.n.focus();return setStatus(st,"err","Aantal moet minimaal 1 zijn.")}
   if(w>1000||h>1000){if(!confirm(`${fmtN(w,1)} × ${fmtN(h,1)} cm is erg groot. Klopt het dat dit centimeters zijn?`))return}
   const id=Q.id.value.trim()||nextId();
-  addPaneRow({id,w:+w.toFixed(2),h:+h.toFixed(2),n,rot:Q.rot.value,room:Q.room.value.trim()},{flash:true});
+  addPaneRow({id,w:+w.toFixed(2),h:+h.toFixed(2),n,rot:Q.rot.value,room:Q.room.value.trim()},{flash:true,photo:quickPhoto});
+  quickPhoto=null;paintPhotoBtn(qPhotoBtn,null);
   invalidate();saveDraft();
   setStatus(st,"ok",`${id} toegevoegd: ${fmtN(w,1)} × ${fmtN(h,1)} cm${n>1?` (${n}×)`:""}.`);
   Q.id.value="";Q.w.value="";Q.h.value="";Q.n.value="1"; // ruimte en rotatie blijven staan voor de volgende ruit
@@ -307,7 +393,13 @@ function drawPlan(res){
   ctx.font="12px Segoe UI, Arial";ctx.textBaseline="top";
   res.placed.forEach(p=>{const x=p.x*scale,y=p.y*scale,w=p.w*scale,h=p.h*scale;ctx.fillStyle=colorFor(p.item.baseId);ctx.fillRect(x,y,w,h);ctx.strokeStyle="#344d60";ctx.lineWidth=1;ctx.strokeRect(x,y,w,h);ctx.fillStyle="#102535";if(w>42&&h>17)ctx.fillText(`${p.item.label}${p.rotated?" ↻":""}`,x+4,y+4);if(w>90&&h>35)ctx.fillText(`${Math.round(p.w)}×${Math.round(p.h)} mm`,x+4,y+20)});
 }
-async function calculatePlan(){
+let planRun=null;
+/** Loopt er al een berekening, dan wachten we daarop i.p.v. "mislukt" te melden. */
+function calculatePlan(){
+  if(!planRun)planRun=runCalculatePlan().finally(()=>{planRun=null});
+  return planRun;
+}
+async function runCalculatePlan(){
   if(busy)return false;
   const {items,errors,splitNotices}=readItems();
   const st=$("#gndPlanStatus");
@@ -373,6 +465,93 @@ function calculatePrices(){
 $("#gndInstallMode").addEventListener("change",calculatePrices);
 $("#gndMountClass").addEventListener("change",calculatePrices);
 
+/* ---------------- ROI (zelfde model als de ROI-tab van de GlassNext Suite) ---------------- */
+const ROI_BTU_PER_U=0.1761101838;
+const ROI_PROFILES={
+  single:{label:"4 mm enkelglas",uBefore:5.80,uAfter:1.85,coolSave:15},
+  double_pre2008:{label:"Dubbelglas (voor 2008)",uBefore:2.90,uAfter:1.40,coolSave:15},
+  triple_air:{label:"Driedubbelglas (lucht)",uBefore:2.20,uAfter:1.22,coolSave:15},
+  double_lowe:{label:"Dubbelglas Low-E",uBefore:1.20,uAfter:0.83,coolSave:15},
+  planitherm_one:{label:"Dubbelglas Planitherm One",uBefore:1.10,uAfter:0.78,coolSave:15},
+  skn176:{label:"Dubbelglas SKN 176",uBefore:1.10,uAfter:0.78,coolSave:15},
+  triple_planitherm:{label:"Driedubbelglas met Planitherm One",uBefore:1.00,uAfter:0.73,coolSave:15}
+};
+const ROI_SET={
+  hdd:num(O.gn_roi_hdd)||4676,boilerEff:num(O.gn_roi_boiler_eff)||90,gasKwh:num(O.gn_roi_gas_kwh)||9.77,
+  factor:O.gn_roi_building_factor===undefined||O.gn_roi_building_factor===""?100:num(O.gn_roi_building_factor),
+  eia:num(O.gn_roi_eia_net)||0,co2Price:O.gn_roi_co2_price===undefined?70:num(O.gn_roi_co2_price)||0,
+  co2Gas:num(O.gn_roi_co2_gas)||2.134,co2Elec:num(O.gn_roi_co2_elec)||0.268,years:parseInt(O.gn_roi_years,10)||10,
+  gasPrice:num(O.gn_roi_gas_price)||1.31,elecPrice:num(O.gn_roi_elec_price)||0.27
+};
+const RG=$("#gndRoiGlass");
+RG.innerHTML=Object.entries(ROI_PROFILES).map(([k,p])=>`<option value="${k}">${esc(p.label)}</option>`).join("");
+function roiDefaults(){RG.value="single";$("#gndRoiGas").value=String(ROI_SET.gasPrice).replace(".",",");$("#gndRoiElec").value=String(ROI_SET.elecPrice).replace(".",",")}
+roiDefaults();
+function calculateROI(){
+  const st=$("#gndRoiStatus");
+  if(!lastPlan){lastROI=null;setStatus(st,"warn","Bereken eerst het snijplan (stap 3).");$("#gndRoiMetrics").innerHTML="";$("#gndRoiRows").innerHTML="";return null}
+  if(!lastCalc)calculatePrices();
+  const prof=ROI_PROFILES[RG.value]||ROI_PROFILES.single,area=lastPlan.stats.netArea;
+  const uBefore=prof.uBefore,uAfter=prof.uAfter,delta=Math.max(0,uBefore-uAfter),improvement=uBefore>0?delta/uBefore*100:0;
+  const eff=Math.max(.01,ROI_SET.boilerEff/100),gasSaveM2=Math.max(0,(delta*ROI_SET.hdd*24/1000)/(Math.max(.01,ROI_SET.gasKwh)*eff));
+  const factor=Math.max(0,ROI_SET.factor)/100,gasM2=gasSaveM2*factor,coolM2=prof.coolSave*factor;
+  const gasPrice=Math.max(0,num($("#gndRoiGas").value)||0),elecPrice=Math.max(0,num($("#gndRoiElec").value)||0);
+  const mountRate=SET.mountRates.average||45,mountEst=selfInstall()?0:area*mountRate;
+  const investment=Math.max(0,lastCalc.subtotal-(lastCalc.mountGross-lastCalc.mountDisc)+mountEst);
+  const eia=investment*ROI_SET.eia/100,netInvest=investment-eia;
+  const gasYear=gasM2*area,coolYear=coolM2*area,gasValue=gasYear*gasPrice,elecValue=coolYear*elecPrice,energyValue=gasValue+elecValue;
+  const co2KgM2=gasM2*ROI_SET.co2Gas+coolM2*ROI_SET.co2Elec,co2Tons=co2KgM2*area/1000,co2Value=co2Tons*ROI_SET.co2Price,totalValue=energyValue+co2Value;
+  const pbtEnergy=energyValue>0?netInvest/energyValue:NaN,pbtIncl=totalValue>0?netInvest/totalValue:NaN,years=Math.max(1,ROI_SET.years);
+  const cumulative=totalValue*years,roiPct=netInvest>0?(cumulative-netInvest)/netInvest*100:NaN;
+  lastROI={glassKey:RG.value,glassType:prof.label,area,uBefore,uAfter,improvement,btuBefore:uBefore*ROI_BTU_PER_U,btuAfter:uAfter*ROI_BTU_PER_U,btuDelta:delta*ROI_BTU_PER_U,
+    gasPrice,elecPrice,gasM2,coolM2,gasYear,coolYear,gasValue,elecValue,energyValue,co2KgM2,co2Tons,co2Value,totalValue,
+    investment,mountEst,mountRate,eia,netInvest,pbtEnergy,pbtIncl,years,cumulative,roiPct};
+  const yrs=v=>isFinite(v)?fmtN(v,1)+" jaar":"—";
+  setStatus(st,"ok",`${esc(prof.label)}: Ug ${fmtN(uBefore,2)} → ${fmtN(uAfter,2)} W/m²K (${fmtN(improvement,1)}% beter), ${fmtN(area)} m² glas.`,true);
+  $("#gndRoiMetrics").innerHTML=[
+    ["Gasbesparing",fmtN(gasYear,0)+" m³/jaar"],["Elektrabesparing",fmtN(coolYear,0)+" kWh/jaar"],["CO₂-reductie",fmtN(co2Tons,2)+" ton/jaar"],
+    ["Voordeel per jaar",fmtMoney(totalValue)],["Netto investering",fmtMoney(netInvest)],["Terugverdientijd",yrs(pbtIncl)],
+    [`ROI na ${years} jaar`,isFinite(roiPct)?fmtN(roiPct,0)+"%":"—"],["Alleen energie",yrs(pbtEnergy)]
+  ].map(([l,v])=>`<div class="gnd-metric">${l}<strong>${v}</strong></div>`).join("");
+  const tr=(a,b,c,d,cls="")=>`<tr class="${cls}"><td>${a}</td><td>${b}</td><td>${c}</td><td>${d}</td></tr>`;
+  $("#gndRoiRows").innerHTML=
+    tr("Gas",fmtN(gasM2,2)+" m³",fmtN(gasYear,0)+" m³",fmtMoney(gasValue))+
+    tr("Elektriciteit",fmtN(coolM2,1)+" kWh",fmtN(coolYear,0)+" kWh",fmtMoney(elecValue))+
+    tr("CO₂",fmtN(co2KgM2,1)+" kg",fmtN(co2Tons,2)+" ton",fmtMoney(co2Value))+
+    tr("Totaal voordeel","","",fmtMoney(totalValue),"gnd-total")+
+    (mountEst>0?tr(`Montage-indicatie (à ${fmtMoney(mountRate)}/m²)`,"","",fmtMoney(mountEst)):"")+
+    tr("Bruto investering","","",fmtMoney(investment))+
+    (eia?tr("EIA/subsidievoordeel","","","- "+fmtMoney(eia)):"")+
+    tr("Netto investering","","",fmtMoney(netInvest),"gnd-grand");
+  return lastROI;
+}
+RG.addEventListener("change",()=>{calculateROI();saveDraft()});
+["#gndRoiGas","#gndRoiElec"].forEach(id=>$(id).addEventListener("input",()=>{calculateROI();saveDraft()}));
+function roiPdfDoc(customerName){
+  const r=lastROI||calculateROI();if(!r||!(r.area>0)||!window.jspdf?.jsPDF)return null;
+  const {jsPDF}=window.jspdf,doc=new jsPDF({unit:"mm",format:"a4"}),c=customer();
+  const yrs=v=>isFinite(v)?fmtN(v,2)+" jaar":"—";
+  doc.setFont("helvetica","bold");doc.setFontSize(18);doc.text("Glass Next B.V.",15,16);doc.setFontSize(9);doc.setFont("helvetica","normal");doc.text("GlassShield ROI- en besparingsanalyse",15,22);doc.line(15,26,195,26);
+  doc.setFontSize(16);doc.text(`Project: ${customerName||c.customerName}`,15,38);doc.setFontSize(10);let y=49;
+  [`Klant: ${c.customerName}`,...(c.reference?[`Referentie: ${c.reference}`]:[]),`Glastype: ${r.glassType}`,`Glasoppervlak: ${fmtN(r.area)} m²`,
+   `U-/Ug-waarde volgens TDS: ${fmtN(r.uBefore,2)} → ${fmtN(r.uAfter,2)} W/m²K (${fmtN(r.improvement,1)}%)`,
+   `U-factor BTU: ${fmtN(r.btuBefore,4)} → ${fmtN(r.btuAfter,4)} | verschil ${fmtN(r.btuDelta,4)}`,
+   `Energieprijzen: gas ${fmtMoney(r.gasPrice)}/m³ | elektriciteit ${fmtMoney(r.elecPrice)}/kWh`].forEach(t=>{doc.text(t,15,y);y+=7});
+  y+=4;doc.setFont("helvetica","bold");doc.text("Jaarlijkse besparingen",15,y);doc.setFont("helvetica","normal");y+=8;
+  [["Gas",`${fmtN(r.gasYear)} m³ | ${fmtMoney(r.gasValue)}`],["Elektriciteit",`${fmtN(r.coolYear)} kWh | ${fmtMoney(r.elecValue)}`],["CO₂",`${fmtN(r.co2Tons,2)} ton | ${fmtMoney(r.co2Value)}`],["Totaal voordeel",fmtMoney(r.totalValue)]].forEach(([a,b])=>{doc.text(a,15,y);doc.text(b,195,y,{align:"right"});y+=7});
+  y+=5;doc.setFont("helvetica","bold");doc.text("Investering en terugverdientijd",15,y);doc.setFont("helvetica","normal");y+=8;
+  [...(r.mountEst>0?[["Calculatie excl. montage",fmtMoney(r.investment-r.mountEst)],[`Montage-indicatie (gemiddeld à ${fmtMoney(r.mountRate)}/m²)`,fmtMoney(r.mountEst)]]:[]),
+   ["Bruto investering",fmtMoney(r.investment)],["EIA/subsidievoordeel","- "+fmtMoney(r.eia)],["Netto investering",fmtMoney(r.netInvest)],
+   ["TVT energie-only",yrs(r.pbtEnergy)],["TVT incl. CO₂",yrs(r.pbtIncl)],[`ROI na ${r.years} jaar`,isFinite(r.roiPct)?fmtN(r.roiPct,1)+"%":"—"]].forEach(([a,b])=>{doc.text(a,15,y);doc.text(b,195,y,{align:"right"});y+=7});
+  y+=10;doc.setFontSize(8);doc.text(doc.splitTextToSize("Deze berekening is een scenarioanalyse. Werkelijke prestaties zijn afhankelijk van onder andere glasopbouw, oriëntatie, klimaat, installaties, bezetting, ventilatie en gebouwgebruik. De uitkomst is geen garantie.",180),15,y);
+  return doc;
+}
+$("#gndRoiPdf").onclick=()=>{
+  const doc=roiPdfDoc();if(!doc)return toast("Bereken eerst het snijplan.",3000);
+  const name=`${safeName(customer().customerName)||"GlassNext"}_ROI.pdf`;
+  try{const url=URL.createObjectURL(doc.output("blob"));const w=window.open(url,"_blank");if(!w)doc.save(name);setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(e){doc.save(name)}
+};
+
 /* ---------------- Snijplan-PDF (overzicht, A4) ---------------- */
 function planPdfDataUri(customer){
   if(!lastPlan||!window.jspdf?.jsPDF)return null;
@@ -428,7 +607,7 @@ const outbox={
   save(l){if(l.length)localStorage.setItem(this.key,JSON.stringify(l));else localStorage.removeItem(this.key)}, // kan QuotaExceeded gooien
   add(item){this.save([...this.all(),item])},
   update(cid,patch){try{this.save(this.all().map(x=>x.cid===cid?{...x,...patch}:x))}catch(e){}},
-  remove(cid){try{this.save(this.all().filter(x=>x.cid!==cid))}catch(e){}}
+  remove(cid){try{this.save(this.all().filter(x=>x.cid!==cid))}catch(e){}idb.delPrefix(`q|${cid}|`)}
 };
 const MAX_QUEUED_FILE=1.5*1024*1024;
 const newCid=()=>{try{if(crypto.randomUUID)return crypto.randomUUID()}catch(e){}return Date.now().toString(36)+"-"+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2)};
@@ -439,27 +618,53 @@ function dataUrlToFile(u,name){
   return new File([arr],name||"import",{type});
 }
 /** Verstuurt één offerte (direct of uit de wachtrij). Gooit bij fouten; err.server = afgewezen door de server. */
-async function sendEntry(e){
-  let file=e.file instanceof File?e.file:null;
-  if(!file&&e.fileData){try{file=dataUrlToFile(e.fileData,e.fileName)}catch(err){file=null}}
-  const resp=await ajax("gnd_submit_quote",fd=>{
-    fd.append("project_json",JSON.stringify(e.payload));
-    if(file)fd.append("import_file",file,file.name);
-    if(e.pdf)fd.append("plan_pdf",e.pdf);
-  });
-  if(!resp.success){const er=Error(resp.data?.message||"Onbekende fout.");er.server=true;throw er}
-  return resp.data;
+async function sendEntry(e,onStep){
+  // Fase 1: de offerte zelf (idempotent via clientId).
+  if(!e.postId){
+    let file=e.file instanceof File?e.file:null;
+    if(!file&&e.fileData){try{file=dataUrlToFile(e.fileData,e.fileName)}catch(err){file=null}}
+    const resp=await ajax("gnd_submit_quote",fd=>{
+      fd.append("project_json",JSON.stringify(e.payload));
+      if(file)fd.append("import_file",file,file.name);
+      if(e.pdf)fd.append("plan_pdf",e.pdf);
+      if(e.roiPdf)fd.append("roi_pdf",e.roiPdf);
+    });
+    if(!resp.success){const er=Error(resp.data?.message||"Onbekende fout.");er.server=true;throw er}
+    e.postId=resp.data.postId;e.result=resp.data;
+    if(e.queued)outbox.update(e.cid,{postId:e.postId,result:e.result});
+  }
+  // Fase 2: foto's, één per verzoek (geen last van uploadlimieten van de server).
+  const names=e.photos?e.photos.map(x=>x.name):(e.photoNames||[]);
+  const done=new Set(e.donePhotos||[]);let i=0;
+  for(const name of names){
+    i++;if(done.has(name))continue;
+    if(onStep)onStep(`Foto ${i} van ${names.length} versturen…`);
+    let blob=e.photos?.find(x=>x.name===name)?.blob||null;
+    if(!blob)blob=await idb.get(`q|${e.cid}|${name}`);
+    if(blob){
+      const r=await ajax("gnd_add_photo",fd=>{fd.append("post_id",e.postId);fd.append("name",name);fd.append("photo",blob,name)});
+      if(!r.success){const er=Error(`Foto ${name}: ${r.data?.message||"uploaden mislukt"}`);er.server=true;throw er}
+    }
+    done.add(name);e.donePhotos=[...done];
+    if(e.queued)outbox.update(e.cid,{donePhotos:e.donePhotos});
+  }
+  return e.result;
 }
 /** Zet een offerte in de wachtrij. Geeft true terug als het lukte. */
 async function queueEntry(e){
-  const item={cid:e.cid,createdAt:e.createdAt,customerName:e.customerName,reference:e.reference,pieces:e.pieces,rollArea:e.rollArea,
-    payload:e.payload,pdf:e.pdf||null,fileName:e.file?.name||"",fileData:null,fileSkipped:false,lastError:""};
+  const item={cid:e.cid,queued:true,createdAt:e.createdAt,customerName:e.customerName,reference:e.reference,pieces:e.pieces,rollArea:e.rollArea,
+    payload:e.payload,pdf:e.pdf||null,roiPdf:e.roiPdf||null,fileName:e.file?.name||"",fileData:null,fileSkipped:false,lastError:e.lastError||"",
+    postId:e.postId||null,result:e.result||null,donePhotos:e.donePhotos||[],photoNames:[],photosSkipped:0};
+  for(const ph of (e.photos||[])){
+    if(item.donePhotos.includes(ph.name))continue;
+    if(await idb.set(`q|${e.cid}|${ph.name}`,ph.blob))item.photoNames.push(ph.name);else item.photosSkipped++;
+  }
   if(e.file){
     if(e.file.size<=MAX_QUEUED_FILE){try{item.fileData=await fileToDataUrl(e.file)}catch(err){item.fileSkipped=true}}
     else item.fileSkipped=true;
   }
   // Bij een vol toestelgeheugen eerst bijlagen laten vallen; de ruitmaten en het snijplan zelf zijn het belangrijkst.
-  for(const strip of [[],["fileData"],["fileData","pdf"]]){
+  for(const strip of [[],["fileData"],["fileData","roiPdf"],["fileData","roiPdf","pdf"]]){
     const it={...item};strip.forEach(k=>{it[k]=null});if(strip.includes("fileData")&&item.fileData)it.fileSkipped=true;
     try{outbox.add(it);updateOutboxUi();return true}catch(err){}
   }
@@ -473,7 +678,7 @@ async function sendOutbox(only=null){
   if(!items.length)return;
   outboxBusy=true;updateOutboxUi();
   let sent=0,failed=0,stopped="";
-  for(const it of items){
+  for(const it of items){it.queued=true;
     const card=document.querySelector(`[data-outbox="${CSS.escape(it.cid)}"]`);
     if(card)card.querySelector(".gnd-q-err").textContent="Bezig met versturen…";
     try{
@@ -504,9 +709,9 @@ function updateOutboxUi(){
     <div class="gnd-outbox-list">${items.map(it=>{
       const d=new Date(it.createdAt||Date.now());
       return `<article class="gnd-q is-queued" data-outbox="${esc(it.cid)}">
-        <div class="gnd-q-top"><span class="gnd-q-nr">Nog niet verstuurd</span><span class="gnd-q-date">${esc(d.toLocaleDateString("nl-NL"))} ${esc(d.toLocaleTimeString("nl-NL",{hour:"2-digit",minute:"2-digit"}))}</span></div>
+        <div class="gnd-q-top"><span class="gnd-q-nr">${it.postId?`${esc(it.result?.offerNumber||"Offerte")} · foto's nog niet verstuurd`:"Nog niet verstuurd"}</span><span class="gnd-q-date">${esc(d.toLocaleDateString("nl-NL"))} ${esc(d.toLocaleTimeString("nl-NL",{hour:"2-digit",minute:"2-digit"}))}</span></div>
         <div class="gnd-q-cust">${esc(it.customerName||"–")}</div>
-        <div class="gnd-q-meta">${[it.reference,`${it.pieces||0} stuks · ${fmtN(it.rollArea||0)} m² rol`,it.fileSkipped?"importbestand niet bewaard (te groot)":""].filter(Boolean).map(esc).join(" · ")}</div>
+        <div class="gnd-q-meta">${[it.reference,`${it.pieces||0} stuks · ${fmtN(it.rollArea||0)} m² rol`,(it.photoNames||[]).length?`${(it.photoNames||[]).length-(it.donePhotos||[]).filter(n=>(it.photoNames||[]).includes(n)).length} foto('s) te versturen`:"",it.fileSkipped?"importbestand niet bewaard (te groot)":"",it.photosSkipped?`${it.photosSkipped} foto('s) niet bewaard`:""].filter(Boolean).map(esc).join(" · ")}</div>
         <div class="gnd-q-err">${esc(it.lastError?"Fout bij vorige poging: "+it.lastError:"")}</div>
         <div class="gnd-q-actions">
           <button type="button" class="gnd-btn gnd-small" data-outbox-send="${esc(it.cid)}" ${on&&!outboxBusy?"":"disabled"}>Versturen</button>
@@ -521,7 +726,8 @@ $("#gndOutbox").addEventListener("click",e=>{
   const d=e.target.closest("[data-outbox-del]");
   if(d){
     const it=outbox.all().find(x=>x.cid===d.dataset.outboxDel);
-    if(it&&confirm(`Offerte voor ${it.customerName||"deze klant"} uit de wachtrij verwijderen? Hij is nog niet verstuurd en gaat dan verloren.`)){outbox.remove(it.cid);updateOutboxUi()}
+    const msg=it?.postId?`De offerte voor ${it.customerName||"deze klant"} is al verstuurd. Alleen de resterende foto's uit de wachtrij verwijderen?`:`Offerte voor ${it?.customerName||"deze klant"} uit de wachtrij verwijderen? Hij is nog niet verstuurd en gaat dan verloren.`;
+    if(it&&confirm(msg)){outbox.remove(it.cid);updateOutboxUi()}
   }
 });
 $("#gndOutboxSendAll").onclick=()=>sendOutbox();
@@ -540,9 +746,9 @@ function validateCustomer(){
 
 /* ---------------- Stappen ---------------- */
 let step=1;
-const STEP_TITLES={1:"Klant en project",2:"Ruitmaten",3:"Snijplan en calculatie",4:"Controleren en versturen"};
+const STEP_TITLES={1:"Klant en project",2:"Ruitmaten",3:"Snijplan en calculatie",4:"ROI-berekening",5:"Controleren en versturen"};
 async function setStep(n,{scroll=true}={}){
-  n=Math.min(4,Math.max(1,n));
+  n=Math.min(5,Math.max(1,n));
   // Vooruit springen mag alleen als de tussenliggende stappen kloppen.
   if(n>step){
     for(let s=step;s<n;s++){if(!(await canLeave(s))){n=s;break}}
@@ -550,10 +756,11 @@ async function setStep(n,{scroll=true}={}){
   step=n;ROOT.dataset.step=String(n);
   $$(".gnd-steps [data-goto]").forEach(b=>{const s=+b.dataset.goto;b.classList.toggle("is-active",s===n);b.classList.toggle("is-done",s<n)});
   $("#gndTopTitle").textContent=STEP_TITLES[n];
-  $("#gndNext").textContent=n===3?"Controleren":"Volgende";
+  $("#gndNext").textContent=n===4?"Controleren":"Volgende";
   if(scroll)scrollTop();
   if(n===3&&!lastPlan&&readPanes().length)calculatePlan();
-  if(n===4)renderSummary();
+  if(n===4)calculateROI();
+  if(n===5)renderSummary();
   saveDraft();
 }
 async function canLeave(s){
@@ -580,6 +787,8 @@ function renderSummary(){
     row("Aanbrengen",selfInstall()?"Zelf (alleen levering)":`Door GlassNext · ${CLASS_TEXT[$("#gndMountClass").value]||""}`)+
     row("Ruiten",`${t.count} st. · ${fmtN(t.area)} m² netto`)+
     (lastPlan?row("Rolverbruik",`${fmtN(lastPlan.stats.rollArea)} m² · ${lastPlan.placed.length} stukken`):"")+
+    (lastROI?row("ROI",`${esc(lastROI.glassType)} · ${fmtMoney(lastROI.totalValue)}/jaar · TVT ${isFinite(lastROI.pbtIncl)?fmtN(lastROI.pbtIncl,1)+" jaar":"—"}`):"")+
+    (photos.size?row("Foto's",`${collectPhotos().length} (naam = kenmerk)`):"")+
     (lastCalc?row("Indicatief totaal excl. btw",fmtMoney(lastCalc.subtotal),"gnd-sum-total"):"");
 }
 
@@ -610,8 +819,13 @@ async function submit(){
       netW:p.item.netW,netH:p.item.netH,rotated:p.rotated,margin:p.item.margin,seamSide:p.item.seamSide||""}))}
   };
   let pdf=null;try{pdf=planPdfDataUri(c.customerName)}catch(err){console.warn("PDF mislukt",err)}
+  let roiPdf=null;try{calculateROI();const d=roiPdfDoc(c.customerName);if(d)roiPdf=d.output("datauristring")}catch(err){console.warn("ROI-PDF mislukt",err)}
+  if(lastROI){const r=lastROI;payload.roi={glassKey:r.glassKey,glassType:r.glassType,area:r.area,gasPrice:r.gasPrice,elecPrice:r.elecPrice,gasYear:r.gasYear,coolYear:r.coolYear,
+    co2Tons:r.co2Tons,gasValue:r.gasValue,elecValue:r.elecValue,co2Value:r.co2Value,totalValue:r.totalValue,investment:r.investment,netInvest:r.netInvest,
+    pbtEnergy:isFinite(r.pbtEnergy)?r.pbtEnergy:0,pbtIncl:isFinite(r.pbtIncl)?r.pbtIncl:0,roiPct:isFinite(r.roiPct)?r.roiPct:0,years:r.years,uBefore:r.uBefore,uAfter:r.uAfter}}
+  payload.panes=payload.panes.map(({uid,...p})=>p);
   const entry={cid,createdAt:Date.now(),customerName:c.customerName,reference:c.reference,
-    pieces:lastPlan.placed.length,rollArea:lastPlan.stats.rollArea,payload,pdf,file:importFile||null};
+    pieces:lastPlan.placed.length,rollArea:lastPlan.stats.rollArea,payload,pdf,roiPdf,file:importFile||null,photos:collectPhotos()};
   let ok=false;
   const toQueue=async why=>{
     if(await queueEntry(entry)){
@@ -624,16 +838,24 @@ async function submit(){
   if(!navigator.onLine){await toQueue("Geen verbinding.");btn.disabled=submitted;btn.textContent=submitLabel();return}
   setStatus(st,"","Offerte wordt opgeslagen en naar Odoo verstuurd…");
   try{
-    const d=await sendEntry(entry);
+    const d=await sendEntry(entry,msg=>setStatus(st,"",msg));
     ok=true;finishSubmitUi();
-    const o=d.odoo||{};
+    const o=d.odoo||{},np=entry.photos.length;
     if(o.success){
-      setStatus(st,"",`<div class="gnd-result ok">Offerte <b>${esc(d.offerNumber)}</b> is aangemaakt${o.orderName?` in Odoo als <b>${esc(o.orderName)}</b>`:""}.`+(o.url?` <a href="${esc(o.url)}" target="_blank" rel="noopener">Openen in Odoo</a>`:"")+`</div>`,true);
+      setStatus(st,"",`<div class="gnd-result ok">Offerte <b>${esc(d.offerNumber)}</b> is aangemaakt${o.orderName?` in Odoo als <b>${esc(o.orderName)}</b>`:""}${np?`, met ${np} foto${np>1?"'s":""}`:""}.`+(o.url?` <a href="${esc(o.url)}" target="_blank" rel="noopener">Openen in Odoo</a>`:"")+`</div>`,true);
     }else{
       setStatus(st,"",`<div class="gnd-result warn">Offerte <b>${esc(d.offerNumber)}</b> is opgeslagen, maar het doorzetten naar Odoo is mislukt: ${esc(o.error||"onbekende fout")}. Je kunt het opnieuw proberen bij <b>Offertes</b>.</div>`,true);
     }
   }catch(err){
-    if(sessionExpired(err)){/* concept bewaard, opnieuw inloggen */}
+    if(entry.postId){
+      // Offerte staat er al; alleen (een deel van) de foto's ontbreekt: die gaan naar de wachtrij.
+      entry.lastError=isNetErr(err)?"":err.message;
+      if(await queueEntry(entry)){
+        ok=true;finishSubmitUi();
+        setStatus(st,"",`<div class="gnd-result warn">Offerte <b>${esc(entry.result?.offerNumber||"")}</b> is aangemaakt, maar niet alle foto's zijn verstuurd${isNetErr(err)?" (verbinding viel weg)":": "+esc(err.message)}. De resterende foto's staan in de <b>wachtrij</b> bij <b>Offertes</b>.</div>`,true);
+      }else setStatus(st,"err",`Offerte is aangemaakt, maar de foto's konden niet worden verstuurd of bewaard: ${err.message}`);
+    }
+    else if(sessionExpired(err)){/* concept bewaard, opnieuw inloggen */}
     else if(isNetErr(err))await toQueue("De verbinding viel weg tijdens het versturen.");
     else setStatus(st,"err",`Versturen mislukt: ${err.message}`);
   }finally{if(!ok){btn.disabled=false;btn.textContent=submitLabel()}}
@@ -649,6 +871,7 @@ function resetForm(){
   $("#gndSubmit").classList.remove("gnd-hidden");$("#gndSubmit").disabled=false;$("#gndSubmit").textContent=submitLabel();$("#gndDone").classList.add("gnd-hidden");
   $(".gnd-actionbar").classList.remove("gnd-hidden");
   Q.id.value="";Q.w.value="";Q.h.value="";Q.n.value="1";Q.room.value="";Q.rot.value=SET.rotateDefault;
+  photos.clear();quickPhoto=null;paintPhotoBtn(qPhotoBtn,null);roiDefaults();
   invalidate();calculatePrices();store.clear();setStep(1);
 }
 $("#gndReset").onclick=()=>{if(confirm("Nieuwe offerte starten? De huidige invoer wordt gewist."))resetForm()};
@@ -658,7 +881,8 @@ $("#gndNewAfterSubmit").onclick=resetForm;
 let saveTimer=null;
 function draftState(){
   return{v:1,savedAt:Date.now(),step,customer:customer(),installMode:$("#gndInstallMode").value,mountClass:$("#gndMountClass").value,
-    panes:readPanes(),costs:rawOtherCosts(),quick:{room:Q.room.value,rot:Q.rot.value},importFileName:importFile?.name||""};
+    panes:readPanes(),costs:rawOtherCosts(),quick:{room:Q.room.value,rot:Q.rot.value},importFileName:importFile?.name||"",
+    roi:{glass:RG.value,gas:$("#gndRoiGas").value,elec:$("#gndRoiElec").value}};
 }
 function saveDraft(){
   if(submitted)return;
@@ -682,6 +906,9 @@ function restoreDraft(){
   $("#gndOtherCosts").innerHTML="";(d.costs||[]).forEach(x=>addCostRow({description:x.description,amount:x.amount}));
   if(d.quick){Q.room.value=d.quick.room||"";if(d.quick.rot)Q.rot.value=d.quick.rot}
   if(d.importFileName)setStatus($("#gndImportStatus"),"",`Ruitmaten uit ${d.importFileName} zijn hersteld (het bestand zelf wordt niet als bijlage meegestuurd).`);
+  if(d.roi){if(ROI_PROFILES[d.roi.glass])RG.value=d.roi.glass;if(d.roi.gas)$("#gndRoiGas").value=d.roi.gas;if(d.roi.elec)$("#gndRoiElec").value=d.roi.elec}
+  // Foto's van het concept terughalen uit IndexedDB.
+  [...paneBody.querySelectorAll("tr")].forEach(async tr=>{const b=await idb.get(DRAFT_PHOTO_PREFIX+tr.dataset.uid);if(b instanceof Blob)setRowPhoto(tr,b)});
   invalidate();
   const when=new Date(d.savedAt||Date.now());
   toast(`Concept van ${when.toLocaleDateString("nl-NL")} ${when.toLocaleTimeString("nl-NL",{hour:"2-digit",minute:"2-digit"})} hersteld`,3000);
@@ -795,5 +1022,5 @@ step=restoredStep||1;ROOT.dataset.step=String(step);
 setStep(step,{scroll:false});
 if(CFG.mode==="app"){const v=viewFromHash();if(v!=="new")setView(v,{push:false})}
 // Exporteer een paar functies voor de testharnas (niet nodig in productie).
-window.GND_APP={outbox,sendOutbox,updateOutboxUi,submit,setStep,setView,calculatePlan,readPanes,importPaneFile,draftState,get step(){return step},get lastPlan(){return lastPlan}};
+window.GND_APP={outbox,sendOutbox,updateOutboxUi,submit,calculateROI,collectPhotos,setRowPhoto,photos,idb,get lastROI(){return lastROI},setStep,setView,calculatePlan,readPanes,importPaneFile,draftState,get step(){return step},get lastPlan(){return lastPlan}};
 })();

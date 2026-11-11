@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "nl.glassnext.dealers",
+        "sha256_cert_fingerprints": ["94:63:AD:E2:56:D0:7C:ED:68:2C:7F:72:A6:D4:56:DE:00:8A:6B:99:92:11:B9:98:73:74:68:AA:3A:4E:88:3A"]
+      }
+    }]

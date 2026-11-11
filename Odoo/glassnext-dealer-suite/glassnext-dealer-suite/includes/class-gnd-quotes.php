@@ -21,6 +21,7 @@ class GND_Quotes {
         add_action('wp_ajax_gnd_submit_quote', [$this, 'ajax_submit']);
         add_action('wp_ajax_gnd_list_quotes', [$this, 'ajax_list']);
         add_action('wp_ajax_gnd_retry_odoo', [$this, 'ajax_retry']);
+        add_action('wp_ajax_gnd_add_photo', [$this, 'ajax_add_photo']);
         add_action('wp_ajax_gnd_refresh_nonce', [$this, 'ajax_refresh_nonce']);
         add_action('wp_ajax_nopriv_gnd_refresh_nonce', [$this, 'ajax_refresh_nonce']);
     }
@@ -178,6 +179,7 @@ class GND_Quotes {
                 'wasteArea'  => round((float) ($stats['wasteArea'] ?? 0), 4),
                 'loss'       => round((float) ($stats['loss'] ?? 0), 2),
             ],
+            'roi'          => $this->sanitize_roi($data['roi'] ?? null),
             'calc'         => is_array($data['calc'] ?? null) ? array_map('floatval', array_intersect_key($data['calc'], array_flip(['subtotal', 'vat', 'total', 'matGross', 'cut', 'other']))) : [],
             'planData'     => [
                 'rollW'    => $roll_w,
@@ -239,6 +241,12 @@ class GND_Quotes {
         update_post_meta($post_id, '_gnd_attachment_ids', $attachment_ids);
         if ($csv_id) update_post_meta($post_id, '_gn_plan_csv_attachment_id', $csv_id);
         if ($pdf_id) update_post_meta($post_id, '_gn_plan_pdf_attachment_id', $pdf_id);
+        $roi_id = $this->save_pdf_field($post_id, 'roi_pdf', $offer_number . '_ROI.pdf');
+        if ($roi_id) {
+            $attachment_ids[] = $roi_id;
+            update_post_meta($post_id, '_gnd_attachment_ids', $attachment_ids);
+            update_post_meta($post_id, '_gn_roi_pdf_attachment_id', $roi_id);
+        }
 
         $odoo = $this->sync_to_odoo($post_id);
 
@@ -431,7 +439,7 @@ class GND_Quotes {
         if (!$path || !file_exists($path)) return;
         try {
             $odoo->rpc('ir.attachment', 'create', [[
-                'name'      => basename($path),
+                'name'      => get_post_meta($att_id, '_gnd_odoo_name', true) ?: basename($path),
                 'datas'     => base64_encode(file_get_contents($path)),
                 'res_model' => 'sale.order',
                 'res_id'    => $order_id,
@@ -482,7 +490,20 @@ class GND_Quotes {
         $h .= $row('Rollengte', number_format($x['rollLength'], 2, ',', '.') . ' m');
         $h .= $row('Rolverbruik', number_format($x['rollArea'], 2, ',', '.') . ' m²');
         $h .= $row('Snijverlies', number_format($x['wasteArea'], 2, ',', '.') . ' m² (' . number_format($x['loss'], 1, ',', '.') . '%)');
-        $h .= '</table></div>';
+        $h .= '</table>';
+        $r = $rec['roi'] ?? null;
+        if (is_array($r) && $r['area'] > 0) {
+            $n = function ($v, $d = 2) { return number_format((float) $v, $d, ',', '.'); };
+            $h .= $h4('ROI (indicatief)') . '<table style="border-collapse:collapse">';
+            $h .= $row('Glastype', $r['glassType']);
+            $h .= $row('Energieprijzen', '€ ' . $n($r['gasPrice']) . '/m³ gas · € ' . $n($r['elecPrice']) . '/kWh');
+            $h .= $row('Besparing per jaar', $n($r['gasYear'], 0) . ' m³ gas · ' . $n($r['coolYear'], 0) . ' kWh · ' . $n($r['co2Tons']) . ' ton CO₂');
+            $h .= $row('Voordeel per jaar', '€ ' . $n($r['totalValue']));
+            $h .= $row('Netto investering', '€ ' . $n($r['netInvest']));
+            $h .= $row('Terugverdientijd', $r['pbtIncl'] > 0 ? $n($r['pbtIncl']) . ' jaar (incl. CO₂)' : '—');
+            $h .= '</table>';
+        }
+        $h .= '</div>';
         return $h;
     }
 
@@ -528,6 +549,82 @@ class GND_Quotes {
         return $this->save_attachment($post_id, $offer_number . '_ruitmaten_import.' . $ext, $contents, $mimes[$ext]);
     }
 
+    /** Generieke PDF uit een data-URI-veld (bijv. roi_pdf). */
+    private function save_pdf_field($post_id, $field, $filename) {
+        $uri = isset($_POST[$field]) ? wp_unslash($_POST[$field]) : '';
+        if (strpos($uri, 'data:application/pdf') !== 0 || strpos($uri, 'base64,') === false) return 0;
+        $bin = base64_decode(explode('base64,', $uri, 2)[1], true);
+        if ($bin === false || strlen($bin) < 100 || strlen($bin) > 15 * self::MAX_UPLOAD || strpos($bin, '%PDF') !== 0) return 0;
+        return $this->save_attachment($post_id, $filename, $bin, 'application/pdf');
+    }
+
+    /** ROI-samenvatting uit de app: alleen bekende velden, als getal of korte tekst. */
+    private function sanitize_roi($roi) {
+        if (!is_array($roi)) return null;
+        $out = ['glassType' => sanitize_text_field($roi['glassType'] ?? ''), 'glassKey' => sanitize_key($roi['glassKey'] ?? '')];
+        foreach (['area', 'gasPrice', 'elecPrice', 'gasYear', 'coolYear', 'co2Tons', 'gasValue', 'elecValue', 'co2Value', 'totalValue', 'investment', 'netInvest', 'pbtEnergy', 'pbtIncl', 'roiPct', 'years', 'uBefore', 'uAfter'] as $k) {
+            $v = $roi[$k] ?? 0;
+            $out[$k] = is_numeric($v) && is_finite((float) $v) ? round((float) $v, 4) : 0;
+        }
+        return $out;
+    }
+
+    /**
+     * Foto per ruitregel, los na de offerte geupload (een bestand per verzoek: geen last van
+     * max_file_uploads/post_max_size). Idempotent per bestandsnaam; staat de order al in Odoo,
+     * dan gaat de foto daar direct als bijlage heen.
+     */
+    public function ajax_add_photo() {
+        $this->guard();
+        $post_id = (int) ($_POST['post_id'] ?? 0);
+        if (!$post_id || get_post_type($post_id) !== 'gn_submission' || get_post_meta($post_id, '_gn_source', true) !== 'dealer') {
+            wp_send_json_error(['message' => 'Offerte niet gevonden.']);
+        }
+        if (!current_user_can('manage_options') && (int) get_post_meta($post_id, '_gnd_user_id', true) !== get_current_user_id()) {
+            wp_send_json_error(['message' => 'Geen toegang tot deze offerte.'], 403);
+        }
+        $f = $_FILES['photo'] ?? null;
+        if (!$f || empty($f['tmp_name']) || $f['error'] !== UPLOAD_ERR_OK) {
+            wp_send_json_error(['message' => 'Foto niet ontvangen.']);
+        }
+        if ($f['size'] > 2 * self::MAX_UPLOAD) {
+            wp_send_json_error(['message' => 'Foto is te groot (max. 10 MB).']);
+        }
+        $info = @getimagesize($f['tmp_name']);
+        $mimes = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+        if (!$info || !isset($mimes[$info['mime']])) {
+            wp_send_json_error(['message' => 'Alleen JPG-, PNG- of WebP-foto' . "'" . 's.']);
+        }
+        $base = preg_replace('/\.[^.]+$/', '', (string) wp_unslash($_POST['name'] ?? 'foto'));
+        $base = trim(preg_replace('/[^A-Za-z0-9._-]+/', '_', $base), '._-');
+        if ($base === '') $base = 'foto';
+        $name = substr($base, 0, 60) . '.' . $mimes[$info['mime']];
+
+        $done = get_post_meta($post_id, '_gnd_photo_names', true);
+        if (!is_array($done)) $done = [];
+        if (isset($done[$name])) {
+            wp_send_json_success(['name' => $name, 'attachmentId' => (int) $done[$name], 'duplicate' => true]);
+        }
+        $offer = get_post_meta($post_id, '_gn_offer_number', true) ?: (string) $post_id;
+        $att_id = $this->save_attachment($post_id, $name, file_get_contents($f['tmp_name']), $info['mime'], $offer);
+        if (!$att_id) wp_send_json_error(['message' => 'Opslaan van de foto is mislukt.']);
+        update_post_meta($att_id, '_gnd_odoo_name', $name);
+        $done[$name] = $att_id;
+        update_post_meta($post_id, '_gnd_photo_names', $done);
+        $ids = get_post_meta($post_id, '_gnd_attachment_ids', true);
+        $ids = is_array($ids) ? $ids : [];
+        $ids[] = $att_id;
+        update_post_meta($post_id, '_gnd_attachment_ids', array_values(array_unique(array_filter(array_map('intval', $ids)))));
+
+        $in_odoo = false;
+        $order_id = (int) get_post_meta($post_id, '_gn_odoo_order_id', true);
+        if ($order_id && class_exists('GN_Odoo')) {
+            $this->upload_attachment(GN_Odoo::instance(), $order_id, $att_id);
+            $in_odoo = true;
+        }
+        wp_send_json_success(['name' => $name, 'attachmentId' => $att_id, 'odoo' => $in_odoo]);
+    }
+
     private function save_plan_pdf($post_id, $offer_number) {
         $uri = isset($_POST['plan_pdf']) ? wp_unslash($_POST['plan_pdf']) : '';
         if (strpos($uri, 'data:application/pdf') !== 0 || strpos($uri, 'base64,') === false) return 0;
@@ -536,10 +633,10 @@ class GND_Quotes {
         return $this->save_attachment($post_id, $offer_number . '_snijplan.pdf', $bin, 'application/pdf');
     }
 
-    private function save_attachment($post_id, $filename, $data, $mime) {
+    private function save_attachment($post_id, $filename, $data, $mime, $subdir = '') {
         $up = wp_upload_dir();
         if (!empty($up['error'])) return 0;
-        $dir = $up['path'] . '/glassnext';
+        $dir = $up['path'] . '/glassnext' . ($subdir !== '' ? '/' . sanitize_file_name($subdir) : '');
         if (!file_exists($dir)) wp_mkdir_p($dir);
         $filename = wp_unique_filename($dir, sanitize_file_name($filename));
         $path = $dir . '/' . $filename;

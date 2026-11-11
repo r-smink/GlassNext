@@ -2,7 +2,7 @@
 /**
  * Plugin Name: GlassNext Dealer Suite
  * Description: Afgeschermde mobiele webapp (PWA) voor dealers en beheerders: ruitmaten invoeren of importeren (CSV/XLSX), snijplan berekenen en direct als offerte naar Odoo sturen. Gebruikt de instellingen en Odoo-koppeling van de GlassNext Suite. App: /dealers/ — shortcode: [glassnext_dealer_suite]
- * Version: 1.1.6
+ * Version: 1.2.0
  * Author: GlassNext
  * Requires Plugins: glassnext-suite
  * Text Domain: glassnext-dealer-suite
@@ -10,7 +10,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('GND_VERSION', '1.1.6');
+define('GND_VERSION', '1.2.0');
 define('GND_PLUGIN_FILE', __FILE__);
 define('GND_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('GND_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -268,6 +268,9 @@ class GlassNext_Dealer_Suite {
             'gn_mount_class', 'gn_mount_selected_price', 'gn_mount_area_basis',
             'gn_mount_rate_easy', 'gn_mount_rate_average', 'gn_mount_rate_complex', 'gn_mount_rate_very',
             'gn_other_costs',
+            // ROI (zelfde uitgangspunten als de ROI-tab van de GlassNext Suite)
+            'gn_roi_hdd', 'gn_roi_boiler_eff', 'gn_roi_gas_kwh', 'gn_roi_building_factor', 'gn_roi_eia_net',
+            'gn_roi_gas_price', 'gn_roi_elec_price', 'gn_roi_co2_price', 'gn_roi_co2_gas', 'gn_roi_co2_elec', 'gn_roi_years',
         ];
         $all = GN_Options::get_all_options();
         return array_intersect_key($all, array_flip($keys));

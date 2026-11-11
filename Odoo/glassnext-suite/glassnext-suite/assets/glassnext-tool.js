@@ -788,8 +788,9 @@ function roiOfferHTML(){
   </tbody></table>
   <p class="note">Deze scenarioanalyse is afhankelijk van de werkelijke glasopbouw, gebouwcondities, installaties, energieprijzen en het gebruik. Aan de uitkomst kunnen geen gegarandeerde besparingen worden ontleend.</p>`;
 }
-function roiPDF(){
-  calculateROI();if(!lastROI)return alert("Maak eerst een ROI-berekening.");if(!requirePDF())return;
+/** Bouwt de ROI-PDF (jsPDF-document) of null als er geen ROI te berekenen is. */
+function buildRoiPdfDoc(){
+  calculateROI();if(!lastROI||!(lastROI.area>0)||!window.jspdf?.jsPDF)return null;
   const {jsPDF}=window.jspdf,doc=new jsPDF({unit:"mm",format:"a4"}),p=projectData(),r=lastROI;
   doc.setFont("helvetica","bold");doc.setFontSize(18);doc.text("Glass Next B.V.",15,16);doc.setFontSize(9);doc.setFont("helvetica","normal");doc.text("GlassShield ROI- en besparingsanalyse",15,22);doc.line(15,26,195,26);
   doc.setFontSize(16);doc.text(`Project: ${p.customerName}`,15,38);doc.setFontSize(10);let y=49;
@@ -799,7 +800,12 @@ function roiPDF(){
   y+=5;doc.setFont("helvetica","bold");doc.text("Investering en terugverdientijd",15,y);doc.setFont("helvetica","normal");y+=8;
   [...(r.mountEst>0?[[`Calculatie excl. montage`,fmtMoney(r.investment-r.mountEst)],[`Montage-indicatie (gemiddeld à ${fmtMoney(r.mountRate)}/m²)`,fmtMoney(r.mountEst)]]:[]),[`Bruto investering`,fmtMoney(r.investment)],[`EIA/subsidievoordeel`,"- "+fmtMoney(r.eia)],[`Netto investering`,fmtMoney(r.netInvest)],[`TVT energie-only`,isFinite(r.pbtEnergy)?fmtN(r.pbtEnergy,2)+" jaar":"—"],[`TVT incl. CO₂`,isFinite(r.pbtIncl)?fmtN(r.pbtIncl,2)+" jaar":"—"],[`ROI na ${r.years} jaar`,isFinite(r.roiPct)?fmtN(r.roiPct,1)+"%":"—"]].forEach(([a,b])=>{doc.text(a,15,y);doc.text(b,195,y,{align:"right"});y+=7});
   y+=10;doc.setFontSize(8);const note="Deze berekening is een scenarioanalyse. Werkelijke prestaties zijn afhankelijk van onder andere glasopbouw, oriëntatie, klimaat, installaties, bezetting, ventilatie en gebouwgebruik. De uitkomst is geen garantie.";doc.text(doc.splitTextToSize(note,180),15,y);
-  doc.save(`${safe(p.customerName)}_ROI.pdf`);
+  return doc;
+}
+function roiPDF(){
+  if(!requirePDF())return;
+  const doc=buildRoiPdfDoc();if(!doc)return alert("Maak eerst een ROI-berekening.");
+  doc.save(`${safe(projectData().customerName)}_ROI.pdf`);
 }
 $("#roiPDF").onclick=roiPDF;
 
@@ -1091,6 +1097,11 @@ async function submitOffer(){
         formData.append("plan_pdf_filename",`${safe(p.customerName)}_snijplan.pdf`);
       }
     }catch(e){console.warn("PDF generatie mislukt:",e)}
+    // ROI-PDF standaard meesturen; komt als bijlage op de Odoo-offerte.
+    try{
+      const roiDoc=buildRoiPdfDoc();
+      if(roiDoc)formData.append("roi_pdf",roiDoc.output("datauristring"));
+    }catch(e){console.warn("ROI-PDF generatie mislukt:",e)}
   }
   fetch(ajaxUrl,{method:"POST",body:formData})
     .then(r=>r.json())

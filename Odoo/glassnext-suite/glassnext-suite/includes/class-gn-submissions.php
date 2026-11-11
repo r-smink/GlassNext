@@ -172,6 +172,12 @@ class GN_Submissions {
             update_post_meta($post_id, '_gn_plan_pdf_attachment_id', $pdf_attachment_id);
         }
 
+        // Sla ROI-PDF op (vanuit browser meegestuurd bij aanvragen met snijplan)
+        $roi_attachment_id = $this->save_roi_pdf_attachment($post_id, $offer_number);
+        if ($roi_attachment_id) {
+            update_post_meta($post_id, '_gn_roi_pdf_attachment_id', $roi_attachment_id);
+        }
+
         // Genereer en sla Snijplan CSV op (server-side uit planData)
         $csv_attachment_id = $this->save_plan_csv_attachment($post_id, $offer_number, $decoded);
         if ($csv_attachment_id) {
@@ -202,6 +208,17 @@ class GN_Submissions {
 
         // Verzamel bijlagen voor Odoo (PDF + CSV + foto's als URL)
         $odoo_attachments = $this->build_odoo_attachments($pdf_attachment_id, $csv_attachment_id, $offer_number);
+        if ($roi_attachment_id) {
+            $roi_path = get_attached_file($roi_attachment_id);
+            $roi_url  = wp_get_attachment_url($roi_attachment_id);
+            if ($roi_path && file_exists($roi_path) && $roi_url) {
+                $odoo_attachments[] = [
+                    'name'     => $offer_number . '_ROI.pdf',
+                    'url'      => $roi_url,
+                    'mimetype' => 'application/pdf',
+                ];
+            }
+        }
         foreach ($photo_attachment_ids as $pid) {
             $path = get_attached_file($pid);
             if ($path && file_exists($path)) {
@@ -404,6 +421,18 @@ class GN_Submissions {
         header('Content-Length: ' . strlen($json));
         echo $json;
         exit;
+    }
+
+    /**
+     * Slaat de ROI-PDF (base64 data URI uit de browser, veld roi_pdf) op als attachment.
+     */
+    private function save_roi_pdf_attachment($post_id, $offer_number) {
+        if (empty($_POST['roi_pdf'])) return 0;
+        $data_uri = wp_unslash($_POST['roi_pdf']);
+        if (strpos($data_uri, 'base64,') === false) return 0;
+        $binary = base64_decode(explode('base64,', $data_uri, 2)[1] ?? '', true);
+        if ($binary === false || strlen($binary) < 100 || strncmp($binary, '%PDF', 4) !== 0) return 0;
+        return $this->save_binary_attachment($post_id, sanitize_file_name($offer_number . '_ROI.pdf'), $binary, 'application/pdf');
     }
 
     /**

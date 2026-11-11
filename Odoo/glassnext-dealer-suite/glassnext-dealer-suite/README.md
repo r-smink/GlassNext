@@ -8,15 +8,16 @@ Excel/CSV, snijplan berekenen en de offerte direct als verkoopofferte in Odoo ze
 
 ## Vereisten
 
-- **GlassNext Suite 1.9.2 of hoger** (actief). De Dealer Suite gebruikt daarvan:
+- **GlassNext Suite 1.9.2 of hoger** (actief; 1.9.3 aanbevolen). De Dealer Suite gebruikt daarvan:
   - de Odoo-koppeling (URL, database, API-key, UID) en product-ID's;
   - rolbreedte, snijrand, tussenruimte, optimalisatie en prijzen;
+  - de ROI-uitgangspunten (graaddagen, ketelrendement, CO₂-factoren, standaard gas- en stroomprijs);
   - het aanvragen-overzicht (`GlassNext Suite > Aanvragen`) en het offertenummer.
 - HTTPS (vereist voor installeren als app en de service worker).
 
 ## Installatie
 
-1. Update eerst de GlassNext Suite naar 1.9.2.
+1. Update eerst de GlassNext Suite naar 1.9.3 (die stuurt ook bij website-aanvragen de ROI-PDF mee naar Odoo).
 2. Upload `glassnext-dealer-suite.zip` via Plugins > Nieuwe plugin > Plugin uploaden en activeer.
 3. Open `https://glassnext.nl/dealers/` — de app werkt direct (de route wordt automatisch aangemaakt).
    Er mag **geen gewone pagina** met het adres `/dealers/` bestaan; kies anders een ander adres bij
@@ -63,10 +64,16 @@ Dealers die "Ingelogd blijven" aanvinken blijven 30 dagen ingelogd (beheerders: 
 
 | Tab        | Inhoud |
 |------------|--------|
-| **Nieuw**  | Wizard in 4 stappen: Klant → Maten → Snijplan → Versturen |
+| **Nieuw**  | Wizard in 5 stappen: Klant → Maten → Snijplan → ROI → Versturen |
 | **Offertes** | Verstuurde offertes met Odoo-status; "Opnieuw versturen" bij een fout |
 | **Account** | Uitloggen, app installeren |
 
+- **Foto per ruit:** bij de snelinvoer of per regel één foto (camera of galerij). De foto wordt
+  verkleind (max. 1600 px, JPEG) en krijgt de naam van het kenmerk (`R1.jpg`; dubbel kenmerk → `R1_2.jpg`).
+  Foto's worden na de offerte één voor één verstuurd (geen last van uploadlimieten) en als bijlage aan
+  de Odoo-offerte gehangen. Ze blijven bij concept en wachtrij op het toestel bewaard (IndexedDB).
+- **ROI:** zelfde model als de ROI-tab van de GlassNext Suite. Aan te passen: glastype, gasprijs en
+  elektriciteitsprijs; de overige uitgangspunten komen uit de instellingen. De ROI-PDF gaat altijd mee.
 - **Snelinvoer van maten:** breedte, hoogte, aantal, rotatie, ruimte → *Toevoegen & volgende*;
   het kenmerk (R1, R2…) wordt automatisch opgehoogd, ruimte en rotatie blijven staan.
 - **Concept wordt automatisch op het toestel bewaard** (per gebruiker) en hersteld bij openen.
@@ -112,7 +119,9 @@ Gelijk aan het sjabloon van de lokale GlassNext Suite (CSV met `;` of `,`, of XL
 - Orderregels zoals de websiteflow: GlassShield (m² rolverbruik), aanbrengen, voorsnijden (stuks),
   overige kosten, voorrijkosten (bij aanbrengen door GlassNext). Prijzen komen uit Odoo.
 - Chatter-notitie met klantgegevens, dealer, ruitmaten en snijplancijfers.
-- Bijlagen: origineel importbestand (indien geïmporteerd), snijplan-PDF, snijplan-CSV.
+- Bijlagen: snijplan-PDF, ROI-PDF, snijplan-CSV, foto's per ruit (naam = kenmerk) en het
+  origineel importbestand (indien geïmporteerd).
+- Chatter-notitie bevat ook de ROI-samenvatting (glastype, energieprijzen, besparing, terugverdientijd).
 
 Mislukt de Odoo-sync, dan blijft de offerte bewaard in WordPress en kan via "Opnieuw versturen"
 in het overzicht opnieuw verstuurd worden.

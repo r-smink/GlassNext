@@ -1,0 +1,4 @@
+# Android signing keys (PWABuilder / Play Store) — nooit committen
+signing-key-info.txt
+*.keystore
+*.jks
