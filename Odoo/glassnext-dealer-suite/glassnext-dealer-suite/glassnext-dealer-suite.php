@@ -2,7 +2,7 @@
 /**
  * Plugin Name: GlassNext Dealer Suite
  * Description: Afgeschermde mobiele webapp (PWA) voor dealers en beheerders: ruitmaten invoeren of importeren (CSV/XLSX), snijplan berekenen en direct als offerte naar Odoo sturen. Gebruikt de instellingen en Odoo-koppeling van de GlassNext Suite. App: /dealers/ — shortcode: [glassnext_dealer_suite]
- * Version: 1.1.0
+ * Version: 1.1.2
  * Author: GlassNext
  * Requires Plugins: glassnext-suite
  * Text Domain: glassnext-dealer-suite
@@ -10,7 +10,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('GND_VERSION', '1.1.0');
+define('GND_VERSION', '1.1.2');
 define('GND_PLUGIN_FILE', __FILE__);
 define('GND_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('GND_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -206,7 +206,7 @@ class GlassNext_Dealer_Suite {
                     <tr><th><label for="gnd_app_icon">App-icoon (ID mediabibliotheek)</label></th><td>
                         <input type="number" min="0" id="gnd_app_icon" name="gnd_app_icon" value="<?php echo esc_attr($icon_id ?: ''); ?>" class="small-text">
                         <?php if ($icon_id && wp_attachment_is_image($icon_id)) echo wp_get_attachment_image($icon_id, [48, 48], false, ['style' => 'vertical-align:middle;margin-left:8px;border-radius:8px']); ?>
-                        <p class="description">Vierkante PNG van minimaal 512×512 px (logo met wat ruimte rondom). Leeg = standaardicoon "GN". Het ID staat in de URL bij Media &gt; bestand bewerken (<code>post=123</code>).</p>
+                        <p class="description">Vierkante PNG van minimaal 512×512 px (logo met wat ruimte rondom). Leeg = het meegeleverde GlassNext-logo. Het ID staat in de URL bij Media &gt; bestand bewerken (<code>post=123</code>).</p>
                     </td></tr>
                     <tr><th><label for="gnd_android_package">Android-app (later)</label></th><td>
                         <input type="text" id="gnd_android_package" name="gnd_android_package" value="<?php echo esc_attr(self::opt('gnd_android_package')); ?>" class="regular-text" placeholder="nl.glassnext.dealer"><br>
@@ -361,7 +361,7 @@ class GlassNext_Dealer_Suite {
         }
         $failed = isset($_GET['login']) && $_GET['login'] === 'failed';
         $html  = '<div class="gnd-login">';
-        $html .= '<div class="gnd-login-logo" aria-hidden="true">GN</div>';
+        $html .= '<img class="gnd-login-logo" src="' . esc_url(GND_PWA::icons()['list'][0]['src']) . '" alt="" width="72" height="72">';
         $html .= '<h1>GlassNext Dealer</h1>';
         $html .= '<p>' . esc_html(self::opt('gnd_login_intro')) . '</p>';
         if ($failed) {

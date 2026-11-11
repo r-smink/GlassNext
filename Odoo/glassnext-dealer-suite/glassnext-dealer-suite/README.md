@@ -28,7 +28,7 @@ Excel/CSV, snijplan berekenen en de offerte direct als verkoopofferte in Odoo ze
 
 Sluit `/dealers/` uit van paginacache (WP Rocket, LiteSpeed Cache, W3TC, Cloudflare APO enz.).
 De app stuurt zelf `no-cache`-headers, maar sommige caches negeren die.
-Uitsluiten: `/dealers/`, `/dealers/sw.js`, `/dealers/manifest.webmanifest`.
+Uitsluiten: `/dealers/`, `/dealers/sw`, `/dealers/manifest.webmanifest`.
 
 ### dealer.glassnext.nl → glassnext.nl/dealers
 
@@ -117,7 +117,7 @@ in het overzicht opnieuw verstuurd worden.
 |--------------------------------------|-----|
 | `/dealers/`                          | App-shell (zonder thema, `noindex`) |
 | `/dealers/manifest.webmanifest`      | Web app manifest |
-| `/dealers/sw.js`                     | Service worker (scope `/dealers/`) — cachet alleen app-bestanden, nooit `admin-ajax.php`/login |
+| `/dealers/sw`                        | Service worker (scope `/dealers/`) — cachet alleen app-bestanden, nooit `admin-ajax.php`/login |
 | `/.well-known/assetlinks.json`       | Alleen als Android-package + fingerprint zijn ingevuld |
 
 jsPDF 2.5.1 en SheetJS 0.20.3 worden lokaal meegeleverd (`assets/vendor/`), zodat de app geen

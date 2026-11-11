@@ -7,7 +7,8 @@ if (!defined('ABSPATH')) exit;
  * Routes voor de dealer-webapp:
  *   /{slug}/                       → app (volledig scherm, zonder thema)
  *   /{slug}/manifest.webmanifest   → web app manifest
- *   /{slug}/sw.js                  → service worker (scope /{slug}/)
+ *   /{slug}/sw                     → service worker (scope /{slug}/); zonder .js omdat
+ *                                    sommige servers .js-adressen niet aan WordPress doorgeven
  *   /.well-known/assetlinks.json   → Android TWA-verificatie (alleen als ingesteld)
  */
 class GND_PWA {
@@ -32,7 +33,7 @@ class GND_PWA {
         $slug = preg_quote(GlassNext_Dealer_Suite::opt('gnd_app_slug'), '#');
         add_rewrite_rule('^' . $slug . '/?$', 'index.php?' . self::QV . '=app', 'top');
         add_rewrite_rule('^' . $slug . '/manifest\.webmanifest$', 'index.php?' . self::QV . '=manifest', 'top');
-        add_rewrite_rule('^' . $slug . '/sw\.js$', 'index.php?' . self::QV . '=sw', 'top');
+        add_rewrite_rule('^' . $slug . '/sw(?:\.js)?/?$', 'index.php?' . self::QV . '=sw', 'top');
         add_rewrite_rule('^\.well-known/assetlinks\.json$', 'index.php?' . self::QV . '=assetlinks', 'top');
 
         // Eenmalig flushen na activatie, update of gewijzigde slug.
@@ -82,11 +83,11 @@ class GND_PWA {
     }
 
     public static function sw_url() {
-        return GlassNext_Dealer_Suite::app_url() . 'sw.js?v=' . rawurlencode(GND_VERSION);
+        return GlassNext_Dealer_Suite::app_url() . 'sw?v=' . rawurlencode(GND_VERSION);
     }
 
     /**
-     * Iconen: eigen icoon uit de mediabibliotheek, anders het meegeleverde "GN"-icoon.
+     * Iconen: eigen icoon uit de mediabibliotheek, anders het meegeleverde GlassNext-logo.
      * @return array{apple:string, list:array<int,array{src:string,sizes:string,type:string,purpose:string}>}
      */
     public static function icons() {

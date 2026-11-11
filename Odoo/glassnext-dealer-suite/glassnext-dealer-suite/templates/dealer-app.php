@@ -7,7 +7,7 @@ $gnd_admin = current_user_can('manage_options');
 <div id="gnd-app" class="gnd-mode-<?php echo esc_attr($gnd_mode); ?>" data-view="new" data-step="1">
   <header class="gnd-top">
     <div class="gnd-top-brand">
-      <span class="gnd-logo" aria-hidden="true">GN</span>
+      <img class="gnd-logo" src="<?php echo esc_url(GND_PWA::icons()['list'][0]['src']); ?>" alt="" width="36" height="36">
       <div><div class="gnd-brand">GlassNext Dealer</div><div class="gnd-tag" id="gndTopTitle">Nieuwe offerte</div></div>
     </div>
     <nav class="gnd-tabs" aria-label="Hoofdmenu">
